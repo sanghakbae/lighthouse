@@ -1,10 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 리포트 저장은 클라이언트에서 Firebase Firestore로 직접 처리 (서버 측 스토리지 없음)
@@ -236,6 +234,12 @@ function extractSetCookies(r) {
   return out;
 }
 
+// 프록시 쿠키 속성: HTTPS(배포)면 크로스사이트 허용(None;Secure), HTTP(로컬)면 Lax
+function cookieAttrs(req) {
+  const https = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  return https ? 'Path=/; SameSite=None; Secure' : 'Path=/; SameSite=Lax';
+}
+
 // 모든 메서드 지원 프록시 (GET/POST/...). 본문·쿠키 전달, 리다이렉트 재작성.
 const rawBody = express.raw({ type: () => true, limit: '25mb' });
 async function proxyForward(req, res, target, ua, isEntry) {
@@ -266,9 +270,10 @@ async function proxyForward(req, res, target, ua, isEntry) {
   const jarChanged = Object.keys(setck).length > 0;
   if (jarChanged) Object.assign(jar, setck);
 
+  const attrs = cookieAttrs(req);
   const outCookies = [];
-  if (isEntry) outCookies.push(`lhpo=${Buffer.from(new URL(target).origin).toString('base64')}; Path=/; SameSite=Lax`);
-  if (isEntry || jarChanged) outCookies.push(`lhpx=${Buffer.from(serializeCookieMap(jar)).toString('base64')}; Path=/; SameSite=Lax`);
+  if (isEntry) outCookies.push(`lhpo=${Buffer.from(new URL(target).origin).toString('base64')}; ${attrs}`);
+  if (isEntry || jarChanged) outCookies.push(`lhpx=${Buffer.from(serializeCookieMap(jar)).toString('base64')}; ${attrs}`);
   if (outCookies.length) res.set('Set-Cookie', outCookies);
   res.set('Cache-Control', 'no-store');
 
