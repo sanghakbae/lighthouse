@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 리포트 컬렉션: 읽기 허용, 쓰기는 형식 검증 후 허용
+    match /reports/{doc} {
+      allow read: if true;
+      allow create: if
+        request.resource.data.url is string &&
+        request.resource.data.device is string &&
+        request.resource.data.fetchTime is string;
+      allow update, delete: if false;   // 수정/삭제 금지 (감사 무결성)
+    }
+  }
+}

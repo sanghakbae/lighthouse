@@ -1,0 +1,18 @@
+{
+  "name": "lighthouse-ui",
+  "version": "1.0.0",
+  "description": "Chrome DevTools Lighthouse-like web performance audit tool",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "chrome-launcher": "^1.1.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "lighthouse": "^12.0.0",
+    "puppeteer-core": "^24.0.0"
+  }
+}

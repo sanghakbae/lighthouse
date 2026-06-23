@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lighthouse — 웹 성능 분석</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: rgba(255,255,255,0.08);
+  --primary: #f78166;
+  --accent: #58a6ff;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --good: #3fb950;
+  --warn: #d29922;
+  --poor: #f85149;
+  --radius: 8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+
+/* ── Header ── */
+header{background:var(--surface);border-bottom:1px solid var(--border);min-height:54px;display:flex;align-items:center;gap:12px;padding:8px 16px;flex-shrink:0;z-index:20;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0}
+.logo svg{width:26px;height:26px}
+.logo-text{font-size:16px;font-weight:700;color:var(--text)}
+.logo-text span{color:var(--primary)}
+.url-form{display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:24px;padding:0 6px 0 14px;flex:1;min-width:200px;max-width:600px;margin:0 auto;transition:border-color .2s}
+.url-form:focus-within{border-color:var(--accent)}
+#url-input{background:none;border:none;outline:none;color:var(--text);font-size:13px;flex:1;padding:7px 0;min-width:0}
+#url-input::placeholder{color:var(--muted)}
+.header-btns{display:flex;gap:6px;flex-shrink:0}
+.icon-btn{background:none;border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.icon-btn:hover{border-color:rgba(255,255,255,0.2);color:var(--text)}
+.icon-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,0.1)}
+.run-btn{background:var(--primary);border:none;color:#fff;font-size:13px;font-weight:600;padding:6px 16px;border-radius:20px;cursor:pointer;white-space:nowrap;transition:opacity .2s;flex-shrink:0}
+.run-btn:hover{opacity:.85}
+.run-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── Options bar ── */
+.options-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0}
+.opt-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.device-group{display:flex;gap:4px;flex-wrap:wrap}
+.dev-btn{background:none;border:1px solid var(--border);color:var(--muted);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;transition:all .15s;line-height:1.2}
+.dev-btn .dev-icon{font-size:16px}
+.dev-btn .dev-name{font-size:10px}
+.dev-btn .dev-size{font-size:9px;opacity:.6}
+.dev-btn.active{background:rgba(247,129,102,0.15);border-color:var(--primary);color:var(--text)}
+.dev-btn:hover:not(.active){border-color:rgba(255,255,255,0.2);color:var(--text)}
+.divider{width:1px;height:20px;background:var(--border);flex-shrink:0}
+.cat-checks{display:flex;gap:10px;flex-wrap:wrap}
+.cat-check{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;transition:color .15s}
+.cat-check input{accent-color:var(--primary)}
+.cat-check.on{color:var(--text)}
+.session-area{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.toggle-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.toggle-switch{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
+.toggle-switch input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;background:var(--surface2);border-radius:10px;border:1px solid var(--border);transition:.2s}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;background:var(--muted);border-radius:50%;transition:.2s}
+.toggle-switch input:checked ~ .toggle-track{background:rgba(63,185,80,.2);border-color:var(--good)}
+.toggle-switch input:checked ~ .toggle-thumb{left:18px;background:var(--good)}
+.session-input{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;outline:none;width:260px;max-width:46vw;transition:border-color .2s;display:none}
+.session-input:focus{border-color:var(--good)}
+.session-input.show{display:block}
+
+/* ── Page tabs ── */
+.page-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface);flex-shrink:0;overflow-x:auto}
+.page-tab{background:none;border:none;color:var(--muted);font-size:13px;padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s;font-weight:500;white-space:nowrap}
+.page-tab.active{color:var(--text);border-bottom-color:var(--primary)}
+.page-tab:hover{color:var(--text)}
+
+/* ── Main (full-width responsive) ── */
+.content{flex:1;overflow:hidden;display:flex;flex-direction:column;width:100%}
+main{flex:1;overflow-y:auto;width:100%;padding:clamp(12px,3vw,28px)}
+
+/* ── History sidebar ── */
+.history-sidebar{width:min(320px,90vw);background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;transform:translateX(100%);transition:transform .25s;position:fixed;right:0;top:0;bottom:0;z-index:30;display:flex;flex-direction:column}
+.history-sidebar.open{transform:translateX(0)}
+.history-header{padding:16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.history-header h3{font-size:14px;font-weight:600}
+.close-btn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.close-btn:hover{color:var(--text);background:var(--surface2)}
+.history-list{flex:1;overflow-y:auto}
+.history-empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px}
+.history-item{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.history-item:hover{background:var(--surface2)}
+.hi-url{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.hi-meta{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap}
+.hi-scores{display:flex;gap:6px}
+.hi-score{font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;border:1px solid currentColor}
+.hi-clear{padding:12px 16px;border-top:1px solid var(--border)}
+.hi-clear button{background:none;border:1px solid var(--border);color:var(--muted);font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;width:100%}
+.hi-clear button:hover{border-color:var(--poor);color:var(--poor)}
+
+/* ── Settings modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:460px;max-width:100%;padding:24px;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:16px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.modal-close{margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--accent)}
+.field-row{display:flex;gap:8px}
+.field-row input{flex:1}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.status-dot.ok{background:var(--good)}
+.status-dot.err{background:var(--poor)}
+.status-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:8px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.btn{padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border)}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn-ghost{background:none;color:var(--muted)}
+.btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,.2)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.store-status{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:8px}
+.store-status .pill{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:4px 12px}
+
+/* ── Empty / Loading ── */
+.empty-state{text-align:center;padding:clamp(40px,10vh,80px) 20px}
+.empty-state .icon{font-size:56px;margin-bottom:16px}
+.empty-state h2{font-size:20px;font-weight:700;margin-bottom:8px}
+.empty-state p{color:var(--muted);font-size:14px;line-height:1.6}
+.connect-notice{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.25);border-radius:8px;padding:16px;margin-top:24px;text-align:left;font-size:13px;line-height:1.7}
+.connect-notice code{background:var(--surface2);padding:1px 5px;border-radius:3px;font-family:monospace}
+.loading{text-align:center;padding:clamp(40px,10vh,80px) 20px}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-status{color:var(--muted);font-size:13px;margin-top:6px}
+
+/* ── Result ── */
+.result-header{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.result-url{font-size:18px;font-weight:700;flex:1;min-width:200px;word-break:break-all}
+.badge{background:var(--surface2);border-radius:4px;padding:3px 10px;font-size:11px;color:var(--muted);border:1px solid var(--border);white-space:nowrap}
+
+.section-title{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;margin-bottom:10px}
+.scores-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:28px}
+.score-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 14px;text-align:center;cursor:pointer;transition:all .15s}
+.score-card:hover{border-color:rgba(255,255,255,.15);transform:translateY(-1px)}
+.score-card.active{border-color:var(--primary);background:rgba(247,129,102,.06)}
+.gauge{position:relative;width:80px;height:80px;margin:0 auto 10px}
+.gauge svg{transform:rotate(-90deg)}
+.gauge-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700}
+.score-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:28px}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;align-items:center;gap:10px}
+.metric-icon{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.metric-name{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.metric-val{font-size:18px;font-weight:700}
+
+.tabs{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab-btn{background:none;border:none;color:var(--muted);font-size:13px;padding:7px 14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s;white-space:nowrap}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--primary)}
+.tab-btn:hover{color:var(--text)}
+
+.audit-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:5px}
+.audit-row{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .12s}
+.audit-row:hover{background:rgba(255,255,255,.03)}
+.audit-icon-cell{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.audit-name{flex:1;font-size:13px}
+.audit-val{font-size:12px;color:var(--muted);white-space:nowrap}
+.audit-chevron{color:var(--muted);font-size:11px;transition:transform .2s}
+.audit-item.open .audit-chevron{transform:rotate(180deg)}
+.audit-body{display:none;padding:10px 14px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.65}
+.audit-item.open .audit-body{display:block}
+.audit-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px;display:block;overflow-x:auto}
+.audit-table th{text-align:left;padding:5px 8px;background:rgba(255,255,255,.04);color:var(--muted);font-weight:600;white-space:nowrap}
+.audit-table td{padding:5px 8px;border-top:1px solid var(--border);word-break:break-all}
+.audit-section-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;margin:16px 0 8px}
+
+/* ── Reports page (full width) ── */
+.reports-page{width:100%}
+.reports-top{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.search-input{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 12px;color:var(--text);font-size:13px;outline:none;flex:1;min-width:180px;max-width:320px;transition:border-color .2s}
+.search-input:focus{border-color:var(--accent)}
+.session-filter{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 12px;color:var(--text);font-size:13px;outline:none}
+.report-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:16px;margin-bottom:8px;cursor:pointer;transition:all .15s;flex-wrap:wrap}
+.report-card:hover{border-color:rgba(255,255,255,.15);transform:translateY(-1px)}
+.rc-info{flex:1;min-width:160px}
+.rc-url{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.rc-meta{font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.rc-session{background:rgba(63,185,80,.15);color:var(--good);border-radius:4px;padding:1px 7px;font-weight:600}
+.rc-scores{display:flex;gap:8px;flex-shrink:0}
+.rc-score{font-size:11px;font-weight:700;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid}
+.no-storage{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.2);border-radius:8px;padding:24px;text-align:center;font-size:13px;line-height:1.8;color:var(--muted)}
+.no-storage code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-family:monospace;color:var(--text)}
+
+/* ── Score colors ── */
+.good{color:var(--good)}.warn{color:var(--warn)}.poor{color:var(--poor)}.na{color:var(--muted)}
+.bg-good{background:rgba(63,185,80,.12)}.bg-warn{background:rgba(210,153,34,.12)}.bg-poor{background:rgba(248,81,73,.12)}
+
+.error-box{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:8px;padding:20px;text-align:center;color:var(--poor);font-size:14px}
+
+/* ── Field data (CrUX 실제 사용자 데이터) ── */
+.field-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:24px}
+.field-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.field-title{font-size:14px;font-weight:700}
+.field-scope{font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 8px}
+.cwv-badge{margin-left:auto;font-size:12px;font-weight:700;border-radius:20px;padding:5px 14px;border:1px solid}
+.cwv-badge.pass{color:var(--good);border-color:var(--good);background:rgba(63,185,80,.12)}
+.cwv-badge.fail{color:var(--poor);border-color:var(--poor);background:rgba(248,81,73,.12)}
+.field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.fmetric{padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.fm-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
+.fm-name{font-size:12px;font-weight:700}
+.fm-sub{font-size:10px;color:var(--muted)}
+.fm-val{font-size:18px;font-weight:700}
+.fm-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:6px;background:var(--surface2)}
+.fm-bar span{display:block;height:100%}
+.fm-legend{font-size:10px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.fm-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px;vertical-align:middle}
+.field-hint{font-size:12px;color:var(--muted);background:var(--surface);border:1px dashed var(--border);border-radius:8px;padding:12px 16px;margin-bottom:24px;line-height:1.6}
+.field-hint code{background:var(--surface2);padding:1px 5px;border-radius:3px;color:var(--text)}
+
+/* ── Device preview ── */
+.preview-wrap{display:flex;flex-direction:column;height:100%;gap:14px}
+.preview-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.preview-toolbar .pv-name{font-size:14px;font-weight:700}
+.preview-toolbar .pv-dim{font-size:12px;color:var(--muted)}
+.preview-toolbar .pv-url{font-size:12px;color:var(--muted);flex:1;min-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.device-stage{flex:1;display:flex;align-items:flex-start;justify-content:center;overflow:auto;min-height:420px;background:radial-gradient(circle at 50% 25%,rgba(255,255,255,.04),transparent 70%);border:1px solid var(--border);border-radius:12px;padding:28px 12px}
+.device-shell{transform-origin:top center;flex-shrink:0}
+.device-frame{background:#0a0a0a;position:relative;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.device-frame.phone{border-radius:46px;padding:13px;border:1px solid #333}
+.device-frame.tablet{border-radius:30px;padding:16px;border:1px solid #333}
+.device-frame.desktop{border-radius:10px;padding:0;border:1px solid #333;overflow:hidden}
+.device-frame iframe{border:none;background:#fff;display:block}
+.device-frame.phone iframe{border-radius:32px}
+.device-frame.tablet iframe{border-radius:14px}
+.phone .notch{position:absolute;top:13px;left:50%;transform:translateX(-50%);width:46%;height:26px;background:#0a0a0a;border-radius:0 0 16px 16px;z-index:2}
+.tablet .cam{position:absolute;top:50%;left:7px;transform:translateY(-50%);width:6px;height:6px;border-radius:50%;background:#333;z-index:2}
+.desktop .browser-bar{height:38px;background:#1c2128;display:flex;align-items:center;gap:7px;padding:0 14px;border-bottom:1px solid #333}
+.desktop .browser-bar .dot{width:11px;height:11px;border-radius:50%}
+.desktop .browser-bar .addr{flex:1;background:#0d1117;border-radius:6px;height:22px;margin-left:8px;display:flex;align-items:center;padding:0 10px;font-size:11px;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pv-hint{font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
+.pv-hint code{background:var(--surface2);padding:1px 5px;border-radius:3px}
+.pv-modes{display:flex;gap:4px}
+.pv-mode{background:none;border:1px solid var(--border);color:var(--muted);font-size:12px;padding:5px 10px;border-radius:6px;cursor:pointer;transition:all .15s}
+.pv-mode.on{background:rgba(247,129,102,.15);border-color:var(--primary);color:var(--text)}
+.pv-mode:hover:not(.on):not(:disabled){border-color:rgba(255,255,255,.2);color:var(--text)}
+.pv-mode:disabled{opacity:.4;cursor:not-allowed}
+.device-frame img{max-width:none}
+
+@media (max-width:640px){
+  .opt-label,.divider{display:none}
+  .session-area{margin-left:0;width:100%}
+  .dev-btn .dev-size{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<header>
+  <a class="logo" href="#">
+    <svg viewBox="0 0 26 26" fill="none">
+      <circle cx="13" cy="13" r="13" fill="#f78166" opacity=".15"/>
+      <path d="M7 19 L13 7 L19 19" stroke="#f78166" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="9.5" y1="15" x2="16.5" y2="15" stroke="#f78166" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <span class="logo-text">Light<span>house</span></span>
+  </a>
+
+  <div class="url-form">
+    <input type="url" id="url-input" placeholder="URL 입력 (예: example.com)" autocomplete="off"/>
+  </div>
+
+  <div class="header-btns">
+    <button class="icon-btn" id="history-btn" title="분석 기록">📋</button>
+    <button class="icon-btn" id="settings-btn" title="설정">⚙</button>
+    <button class="run-btn" id="run-btn">▶ 분석</button>
+  </div>
+</header>
+
+<!-- ── Options bar ────────────────────────────────────────────────────── -->
+<div class="options-bar">
+  <span class="opt-label">장치</span>
+  <div class="device-group" id="device-group">
+    <button class="dev-btn" data-device="iphone">
+      <span class="dev-icon">📱</span><span class="dev-name">iPhone</span><span class="dev-size">390×844</span>
+    </button>
+    <button class="dev-btn" data-device="galaxy">
+      <span class="dev-icon">📱</span><span class="dev-name">Galaxy</span><span class="dev-size">360×780</span>
+    </button>
+    <button class="dev-btn" data-device="tablet">
+      <span class="dev-icon">🪟</span><span class="dev-name">iPad</span><span class="dev-size">1024×1366</span>
+    </button>
+    <button class="dev-btn active" data-device="pc">
+      <span class="dev-icon">🖥</span><span class="dev-name">Desktop</span><span class="dev-size">1350×940</span>
+    </button>
+  </div>
+
+  <div class="divider"></div>
+  <span class="opt-label">카테고리</span>
+  <div class="cat-checks" id="cat-checks">
+    <label class="cat-check on"><input type="checkbox" value="performance" checked> 성능</label>
+    <label class="cat-check on"><input type="checkbox" value="accessibility" checked> 접근성</label>
+    <label class="cat-check on"><input type="checkbox" value="best-practices" checked> 권장사항</label>
+    <label class="cat-check on"><input type="checkbox" value="seo" checked> SEO</label>
+  </div>
+
+  <div class="session-area">
+    <span class="toggle-label">세션</span>
+    <label class="toggle-switch" title="세션 저장 사용">
+      <input type="checkbox" id="session-toggle">
+      <span class="toggle-track"></span>
+      <span class="toggle-thumb"></span>
+    </label>
+    <input type="text" class="session-input" id="session-input" placeholder="세션 쿠키 (예: security_portal_auth=...)" autocomplete="off" title="로그인된 페이지를 분석하려면 세션 쿠키를 name=value 형식으로 입력하세요. 여러 개는 ; 로 구분."/>
+  </div>
+</div>
+
+<!-- ── Page tabs ──────────────────────────────────────────────────────── -->
+<div class="page-tabs">
+  <button class="page-tab active" data-page="home">홈</button>
+  <button class="page-tab" data-page="preview">미리보기</button>
+  <button class="page-tab" data-page="reports">저장된 리포트</button>
+</div>
+
+<!-- ── History sidebar ───────────────────────────────────────────────── -->
+<div class="history-sidebar" id="history-panel">
+  <div class="history-header">
+    <h3>📋 분석 기록 (이 브라우저)</h3>
+    <button class="close-btn" id="history-close">✕</button>
+  </div>
+  <div class="history-list" id="history-list"></div>
+  <div class="hi-clear"><button onclick="clearHistory()">기록 전체 삭제</button></div>
+</div>
+
+<!-- ── Settings modal ────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h2>⚙ 설정 <button class="modal-close" id="settings-close">✕</button></h2>
+
+    <div class="field">
+      <label>API 서버 URL</label>
+      <div class="field-row">
+        <input type="url" id="api-url-input" placeholder="http://localhost:3000"/>
+        <button class="btn btn-ghost btn-sm" onclick="testConnection()">연결 확인</button>
+      </div>
+      <div class="status-row">
+        <span class="status-dot" id="conn-dot"></span>
+        <span id="conn-status">확인 안 됨</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>저장소 상태</label>
+      <div class="store-status">
+        <span class="pill"><span class="status-dot" id="r2-dot"></span> Cloudflare R2 <span id="r2-name" style="color:var(--muted)"></span></span>
+        <span class="pill"><span class="status-dot" id="fb-dot"></span> Firebase Firestore</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">
+        세션을 켜고 분석하면 메타데이터는 <b>Firestore</b>, 전체 리포트는 <b>R2 버킷(lighthouse)</b>에 저장됩니다.
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="settings-cancel">취소</button>
+      <button class="btn btn-primary" onclick="saveSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main content ───────────────────────────────────────────────────── -->
+<div class="content">
+  <main id="main">
+    <div class="empty-state" id="empty-state">
+      <div class="icon">🔦</div>
+      <h2>웹 페이지 품질 분석</h2>
+      <p>URL을 입력하고 장치를 선택한 후 분석을 시작하세요.<br>성능 · 접근성 · 권장사항 · SEO를 종합 측정합니다.</p>
+      <div class="connect-notice" id="github-notice" style="display:none;max-width:440px;margin:24px auto 0">
+        <b>⚠ 로컬 서버 연결 필요</b><br>
+        Lighthouse 분석은 로컬 서버에서 실행됩니다.<br><br>
+        <code>git clone https://github.com/sanghakbae/lighthouse</code><br>
+        <code>cd lighthouse &amp;&amp; npm install &amp;&amp; npm start</code><br><br>
+        그 다음 ⚙ 설정에서 <b>http://localhost:3000</b> 을 입력하세요.
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ── Firebase (module) ─────────────────────────────────────────────── -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD8DXt1WqzQ22OZccbiZr2UBqlp_0XYC0s",
+  authDomain: "lighthouse-3d4ff.firebaseapp.com",
+  projectId: "lighthouse-3d4ff",
+  storageBucket: "lighthouse-3d4ff.firebasestorage.app",
+  messagingSenderId: "1009836691928",
+  appId: "1:1009836691928:web:1b650e2593234ff24022ad",
+  measurementId: "G-SC4WWXBQTG"
+};
+
+try {
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Analytics (best-effort; can fail on localhost/file)
+  import("https://www.gstatic.com/firebasejs/11.0.0/firebase-analytics.js")
+    .then(({ getAnalytics }) => { try { getAnalytics(app); } catch {} })
+    .catch(() => {});
+
+  const COL = "reports";
+
+  window.LH_DB = {
+    ready: true,
+    async save(doc) {
+      return addDoc(collection(db, COL), { ...doc, createdAt: serverTimestamp() });
+    },
+    async list(session) {
+      let snap;
+      if (session) {
+        snap = await getDocs(query(collection(db, COL), where("session", "==", session)));
+      } else {
+        snap = await getDocs(query(collection(db, COL), orderBy("fetchTime", "desc"), limit(200)));
+      }
+      const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      return rows.sort((a, b) => new Date(b.fetchTime) - new Date(a.fetchTime));
+    },
+    async sessions() {
+      const snap = await getDocs(query(collection(db, COL), orderBy("fetchTime", "desc"), limit(300)));
+      const set = new Set();
+      snap.docs.forEach(d => { const s = d.data().session; if (s) set.add(s); });
+      return [...set];
+    }
+  };
+  window.dispatchEvent(new Event("lh-db-ready"));
+} catch (e) {
+  console.warn("Firebase init failed:", e);
+  window.LH_DB = null;
+}
+</script>
+
+<!-- ── App logic ─────────────────────────────────────────────────────── -->
+<script>
+const CAT_LABELS = { performance:'성능', accessibility:'접근성', 'best-practices':'권장사항', seo:'SEO' };
+const METRIC_META = {
+  'first-contentful-paint':{label:'FCP',icon:'🖼'},'largest-contentful-paint':{label:'LCP',icon:'🖼'},
+  'total-blocking-time':{label:'TBT',icon:'⛔'},'cumulative-layout-shift':{label:'CLS',icon:'📐'},
+  'speed-index':{label:'Speed Index',icon:'⚡'},'interactive':{label:'TTI',icon:'🖱'},
+  'server-response-time':{label:'TTFB',icon:'🌐'},
+};
+const DEV_ICONS = { iphone:'📱', galaxy:'📱', tablet:'🪟', pc:'🖥' };
+const DEVICE_SIZES = {
+  iphone: { w:390,  h:844,  label:'iPhone', type:'phone' },
+  galaxy: { w:360,  h:780,  label:'Galaxy', type:'phone' },
+  tablet: { w:1024, h:1366, label:'iPad',   type:'tablet' },
+  pc:     { w:1350, h:940,  label:'Desktop',    type:'desktop' },
+};
+
+let currentDevice = 'pc';
+let activeAuditTab = 'performance';
+let currentPage = 'home';
+let _result = null;
+
+const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const isHosted = !isLocal;  // 로컬이 아니면 분석 서버 URL을 별도 지정해야 함
+// 항상 절대 URL 반환 (상대경로 '/audit' 파싱 오류 방지)
+function getApiBase() {
+  if (isLocal) return location.origin;
+  return (localStorage.getItem('lh_api_url') || '').replace(/\/$/, '');
+}
+
+// ── Init ──
+(async function init(){
+  if (isHosted) {
+    document.getElementById('github-notice').style.display = 'block';
+    if (!localStorage.getItem('lh_api_url')) setTimeout(openSettings, 400);
+  }
+  // session restore
+  const urlSession = new URLSearchParams(location.search).get('session');
+  const lsRaw = localStorage.getItem('lh_session_name') || '';
+  let sOn, savedName;
+  if (lsRaw && (!urlSession || lsRaw.split('=')[0].trim() === urlSession)) {
+    // localStorage에 쿠키 전체가 있고 URL 라벨과 일치 → 쿠키 보존
+    savedName = lsRaw;
+    sOn = localStorage.getItem('lh_session') === 'on' || !!urlSession;
+  } else if (urlSession) {
+    savedName = urlSession; sOn = true;   // 라벨만 (쿠키 없음 → 그룹 필터용)
+  } else {
+    savedName = lsRaw; sOn = localStorage.getItem('lh_session') === 'on';
+  }
+  document.getElementById('session-toggle').checked = sOn;
+  document.getElementById('session-input').classList.toggle('show', sOn);
+  document.getElementById('session-input').value = savedName;
+  syncSessionParam();
+
+  await checkStorage();
+  renderHistory();
+})();
+
+// ── Device ──
+document.getElementById('device-group').addEventListener('click', e => {
+  const btn = e.target.closest('.dev-btn'); if (!btn) return;
+  document.querySelectorAll('.dev-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentDevice = btn.dataset.device;
+  if (currentPage === 'preview') renderPreviewPage();
+});
+
+// ── Categories ──
+document.querySelectorAll('.cat-check input').forEach(cb =>
+  cb.addEventListener('change', () => cb.closest('.cat-check').classList.toggle('on', cb.checked)));
+function getCategories(){ return [...document.querySelectorAll('.cat-check input:checked')].map(c => c.value); }
+
+// ── Session ──
+document.getElementById('session-toggle').addEventListener('change', function(){
+  const on = this.checked;
+  localStorage.setItem('lh_session', on ? 'on' : 'off');
+  document.getElementById('session-input').classList.toggle('show', on);
+  if (on) document.getElementById('session-input').focus();
+  syncSessionParam();
+});
+document.getElementById('session-input').addEventListener('input', function(){
+  localStorage.setItem('lh_session_name', this.value.trim());
+  syncSessionParam();
+});
+function sessionEnabled(){ return document.getElementById('session-toggle').checked; }
+function sessionRaw(){ return document.getElementById('session-input').value.trim(); }
+// 값에 '='가 있으면 쿠키(name=value; ...)로 간주 → 인증 주입에 사용
+function sessionCookie(){ const v = sessionRaw(); return v.includes('=') ? v : ''; }
+// 그룹/표시용 라벨 = 쿠키 이름(첫 name) 또는 입력한 이름
+function sessionLabel(){ const v = sessionRaw(); return v ? v.split('=')[0].trim() : ''; }
+// URL 파라미터 동기화: 세션 ON + 값 → ?session=값
+function syncSessionParam(){
+  const p = new URLSearchParams(location.search);
+  // URL에는 라벨(쿠키 이름)만 노출 — 쿠키 값은 민감정보라 URL에 넣지 않음
+  if (sessionEnabled() && sessionLabel()) p.set('session', sessionLabel());
+  else p.delete('session');
+  const qs = p.toString();
+  history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
+
+// ── Page tabs ──
+document.querySelectorAll('.page-tab').forEach(tab => tab.addEventListener('click', () => {
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  currentPage = tab.dataset.page;
+  if (currentPage === 'reports') renderReportsPage();
+  else if (currentPage === 'preview') renderPreviewPage();
+  else renderCurrentResult();
+}));
+
+// ── History sidebar (localStorage) ──
+document.getElementById('history-btn').addEventListener('click', () => {
+  document.getElementById('history-panel').classList.toggle('open');
+  document.getElementById('history-btn').classList.toggle('active');
+});
+document.getElementById('history-close').addEventListener('click', () => {
+  document.getElementById('history-panel').classList.remove('open');
+  document.getElementById('history-btn').classList.remove('active');
+});
+function getHistory(){ try { return JSON.parse(localStorage.getItem('lh_history')||'[]'); } catch { return []; } }
+function saveHistory(entry){
+  const h = getHistory(); h.unshift(entry);
+  localStorage.setItem('lh_history', JSON.stringify(h.slice(0,30)));
+  renderHistory();
+}
+function clearHistory(){ localStorage.removeItem('lh_history'); renderHistory(); }
+function renderHistory(){
+  const list = document.getElementById('history-list');
+  const h = getHistory();
+  if (!h.length){ list.innerHTML = '<div class="history-empty">기록이 없습니다.<br>분석을 실행하면 여기에 저장됩니다.</div>'; return; }
+  list.innerHTML = h.map((item, idx) => {
+    const scores = Object.values(item.categories||{}).map(c =>
+      `<span class="hi-score ${scoreClass(c.score)}">${Math.round((c.score||0)*100)}</span>`).join('');
+    const date = new Date(item.fetchTime).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<div class="history-item" onclick="loadHistory(${idx})">
+      <div class="hi-url">${item.url}</div>
+      <div class="hi-meta"><span>${DEV_ICONS[item.device]||'🖥'} ${item.deviceLabel||item.device}</span>${item.session?`<span class="rc-session">${item.session}</span>`:''}<span>${date}</span></div>
+      <div class="hi-scores">${scores}</div></div>`;
+  }).join('');
+}
+function loadHistory(idx){
+  const h = getHistory(); if (!h[idx]) return;
+  _result = h[idx]; activeAuditTab = Object.keys(_result.categories)[0] || 'performance';
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.toggle('active', t.dataset.page === 'home'));
+  currentPage = 'home'; renderResult(_result);
+  document.getElementById('history-panel').classList.remove('open');
+  document.getElementById('history-btn').classList.remove('active');
+}
+
+// ── Settings ──
+function openSettings(){
+  document.getElementById('api-url-input').value = localStorage.getItem('lh_api_url') || '';
+  document.getElementById('settings-modal').classList.add('open');
+  checkStorage();
+}
+function closeSettings(){ document.getElementById('settings-modal').classList.remove('open'); }
+document.getElementById('settings-btn').addEventListener('click', openSettings);
+document.getElementById('settings-close').addEventListener('click', closeSettings);
+document.getElementById('settings-cancel').addEventListener('click', closeSettings);
+document.getElementById('settings-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('settings-modal')) closeSettings();
+});
+function saveSettings(){
+  const url = document.getElementById('api-url-input').value.trim().replace(/\/$/, '');
+  if (url) localStorage.setItem('lh_api_url', url); else localStorage.removeItem('lh_api_url');
+  closeSettings(); checkStorage();
+}
+async function testConnection(){
+  const url = document.getElementById('api-url-input').value.trim().replace(/\/$/, '') || getApiBase();
+  const dot = document.getElementById('conn-dot'), st = document.getElementById('conn-status');
+  dot.className = 'status-dot'; st.textContent = '확인 중...';
+  try {
+    const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) });
+    const d = await res.json();
+    dot.className = 'status-dot ok';
+    st.textContent = `연결됨${d.storage === 'connected' ? ` · R2: ${d.bucket}` : ''}`;
+  } catch { dot.className = 'status-dot err'; st.textContent = '연결 실패'; }
+}
+async function checkStorage(){
+  // Firebase
+  const fbDot = document.getElementById('fb-dot');
+  if (fbDot) fbDot.className = 'status-dot ' + (window.LH_DB ? 'ok' : '');
+  // R2 via server
+  const r2Dot = document.getElementById('r2-dot'), r2Name = document.getElementById('r2-name');
+  try {
+    const res = await fetch(`${getApiBase()}/health`, { signal: AbortSignal.timeout(3000) });
+    const d = await res.json();
+    if (r2Dot) r2Dot.className = 'status-dot ' + (d.storage === 'connected' ? 'ok' : 'err');
+    if (r2Name) r2Name.textContent = d.bucket ? `(${d.bucket})` : '(미설정)';
+  } catch {
+    if (r2Dot) r2Dot.className = 'status-dot err';
+    if (r2Name) r2Name.textContent = '(서버 미연결)';
+  }
+}
+window.addEventListener('lh-db-ready', checkStorage);
+
+// ── Run audit ──
+document.getElementById('run-btn').addEventListener('click', runAudit);
+// URL 입력 후 Enter는 분석을 실행하지 않음 (실수 방지) — '▶ 분석' 버튼으로만 실행
+document.getElementById('url-input').addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+
+function runAudit(){
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+  const cats = getCategories();
+  if (!cats.length){ alert('최소 하나의 카테고리를 선택해주세요.'); return; }
+
+  // session value required when enabled
+  if (sessionEnabled() && !sessionRaw()){
+    alert('세션이 활성화되어 있습니다. 세션 쿠키(예: security_portal_auth=...)를 입력해주세요.');
+    document.getElementById('session-input').focus();
+    return;
+  }
+
+  const apiBase = getApiBase();
+  if (!apiBase){
+    alert('분석 서버 URL이 설정되지 않았습니다. ⚙ 설정에서 서버 주소(예: http://localhost:3000)를 입력하세요.');
+    openSettings();
+    return;
+  }
+
+  activeAuditTab = cats[0];
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true; btn.textContent = '분석 중...';
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.toggle('active', t.dataset.page === 'home'));
+  currentPage = 'home';
+
+  const main = document.getElementById('main');
+  main.innerHTML = `<div class="loading"><div class="spinner"></div><div style="font-size:15px;font-weight:600">분석 중...</div><div class="loading-status" id="ls">준비 중...</div></div>`;
+
+  const saveToStorage = sessionEnabled();  // session on → also save full report to R2
+  const cookie = sessionEnabled() ? sessionCookie() : '';  // 세션 쿠키 주입 (로그인 분석)
+  const body = JSON.stringify({ url, categories: cats, device: currentDevice, saveToStorage, cookie });
+
+  fetch(`${apiBase}/audit`, { method:'POST', headers:{'Content-Type':'application/json'}, body })
+  .then(res => {
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+    function read(){
+      reader.read().then(({done,value}) => {
+        if (done){ btn.disabled = false; btn.textContent = '▶ 분석'; return; }
+        buf += dec.decode(value,{stream:true});
+        const lines = buf.split('\n'); buf = lines.pop();
+        lines.forEach(line => {
+          if (!line.startsWith('data: ')) return;
+          try {
+            const ev = JSON.parse(line.slice(6));
+            if (ev.type === 'status'){ const el = document.getElementById('ls'); if (el) el.textContent = ev.message; }
+            else if (ev.type === 'result'){ onResult(ev.data); }
+            else if (ev.type === 'error'){ main.innerHTML = `<div class="error-box">⚠ 분석 오류<br><br>${ev.message}</div>`; }
+          } catch {}
+        });
+        read();
+      });
+    }
+    read();
+  })
+  .catch(err => {
+    main.innerHTML = `<div class="error-box">⚠ 연결 오류<br><br>${err.message}<br><br>서버가 실행 중인지 확인하세요.</div>`;
+    btn.disabled = false; btn.textContent = '▶ 분석';
+  });
+}
+
+async function onResult(data){
+  const session = sessionEnabled() ? sessionLabel() : null;
+  data.session = session;
+  _result = data;
+  saveHistory(data);
+  renderResult(data);
+
+  // Persist to Firestore when session enabled
+  if (session && window.LH_DB){
+    try {
+      const scores = {};
+      for (const [k,c] of Object.entries(data.categories)) scores[k] = c.score;
+      await window.LH_DB.save({
+        url: data.url, device: data.device, deviceLabel: data.deviceLabel,
+        fetchTime: data.fetchTime, session, scores,
+        reportId: data.reportId || null,
+        result: stripDetails(data),   // lite render fallback
+      });
+      const badge = document.getElementById('save-badge');
+      if (badge) badge.textContent = '☁ Firestore 저장됨';
+    } catch(e){ console.warn('Firestore save failed', e); }
+  }
+}
+
+// remove heavy audit detail tables before storing in Firestore
+function stripDetails(result){
+  const clone = JSON.parse(JSON.stringify(result));
+  if (clone.audits) for (const a of Object.values(clone.audits)) delete a.details;
+  return clone;
+}
+
+// ── Device preview ──
+function normalizeUrl(u){
+  u = (u||'').trim();
+  if (!u) return '';
+  if (!/^https?:\/\//.test(u)) u = 'https://' + u;
+  return u;
+}
+let _previewMode = localStorage.getItem('lh_preview_mode') || 'shot'; // 'shot' | 'iframe'
+function renderPreviewPage(){
+  const main = document.getElementById('main');
+  const url = normalizeUrl(document.getElementById('url-input').value);
+  const d = DEVICE_SIZES[currentDevice];
+
+  if (!url){
+    main.innerHTML = `<div class="empty-state"><div class="icon">📱</div><h2>장치 미리보기</h2>
+      <p>상단에 URL을 입력하면 선택한 장치(<b>${d.label}</b>) 크기로 사이트를 보여줍니다.</p></div>`;
+    return;
+  }
+
+  const apiBase = getApiBase();
+  const canShot = !(isHosted && !apiBase);   // 서버 연결 가능할 때만 스크린샷
+  const mode = (_previewMode === 'iframe' || !canShot) ? 'iframe' : 'shot';
+
+  // 디바이스 내부 콘텐츠
+  let media;
+  if (mode === 'shot'){
+    const ck = sessionEnabled() ? sessionCookie() : '';
+    const src = `${apiBase}/screenshot?url=${encodeURIComponent(url)}&device=${currentDevice}${ck?`&cookie=${encodeURIComponent(ck)}`:''}&t=${Date.now()}`;
+    media = `<img id="pv-img" width="${d.w}" height="${d.h}" alt="" style="display:block;background:#fff"
+      onload="document.getElementById('pv-loading')?.remove();requestAnimationFrame(fitPreview)"
+      onerror="pvShotError()" src="${src}">`;
+  } else {
+    // 실시간: 서버 프록시로 X-Frame-Options/CSP 우회 (서버 없으면 직접 임베드)
+    const ck = sessionEnabled() ? sessionCookie() : '';
+    const liveSrc = apiBase
+      ? `${apiBase}/proxy?url=${encodeURIComponent(url)}&device=${currentDevice}${ck?`&cookie=${encodeURIComponent(ck)}`:''}`
+      : url;
+    media = `<iframe id="pv-frame" src="${liveSrc}" width="${d.w}" height="${d.h}"
+      onload="requestAnimationFrame(fitPreview)"></iframe>`;
+  }
+
+  let frameInner;
+  if (d.type === 'desktop'){
+    frameInner = `<div class="browser-bar"><span class="dot" style="background:#ff5f56"></span><span class="dot" style="background:#ffbd2e"></span><span class="dot" style="background:#27c93f"></span><span class="addr">${url}</span></div>${media}`;
+  } else if (d.type === 'tablet'){
+    frameInner = `<span class="cam"></span>${media}`;
+  } else {
+    frameInner = `<span class="notch"></span>${media}`;
+  }
+
+  const loading = mode === 'shot'
+    ? `<div id="pv-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);z-index:3;border-radius:inherit"><div class="spinner"></div><div style="color:var(--muted);font-size:12px;margin-top:8px">스크린샷 생성 중...</div></div>`
+    : '';
+
+  main.innerHTML = `<div class="preview-wrap">
+    <div class="preview-toolbar">
+      <span class="pv-name">${DEV_ICONS[currentDevice]} ${d.label}</span>
+      <span class="pv-dim">${d.w} × ${d.h}</span>
+      <span class="pv-url">${url}</span>
+      <div class="pv-modes">
+        <button class="pv-mode${mode==='shot'?' on':''}" onclick="setPreviewMode('shot')" ${canShot?'':'disabled title="서버 연결 필요"'}>📸 스크린샷</button>
+        <button class="pv-mode${mode==='iframe'?' on':''}" onclick="setPreviewMode('iframe')">🪟 실시간</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="renderPreviewPage()">↻ 새로고침</button>
+      <button class="run-btn" onclick="runAudit()">▶ 이 페이지 분석</button>
+    </div>
+    <div class="device-stage" id="device-stage">
+      <div class="device-shell" id="device-shell">
+        <div class="device-frame ${d.type}" style="position:relative">${frameInner}${loading}</div>
+      </div>
+    </div>
+    <div class="pv-hint" id="pv-hint">${mode==='shot'
+      ? `서버 헤드리스 Chrome으로 <b>${d.label}</b>(${d.w}×${d.h}) 화면을 실제 캡처합니다. X-Frame-Options 차단 사이트도 표시됩니다.`
+      : `실시간 모드 — 서버 프록시로 X-Frame-Options/CSP를 우회해 실제 페이지를 임베드합니다. (JS로 데이터를 불러오는 일부 페이지는 완전히 동작하지 않을 수 있습니다)`}</div>
+  </div>`;
+  requestAnimationFrame(fitPreview);
+}
+function setPreviewMode(m){ _previewMode = m; localStorage.setItem('lh_preview_mode', m); renderPreviewPage(); }
+function pvShotError(){
+  const hint = document.getElementById('pv-hint');
+  document.getElementById('pv-loading')?.remove();
+  if (hint) hint.innerHTML = '<span style="color:var(--poor)">⚠ 스크린샷 생성 실패 — 서버가 실행 중인지 확인하세요. \'🪟 실시간\' 모드로 전환할 수 있습니다.</span>';
+}
+function fitPreview(){
+  const stage = document.getElementById('device-stage');
+  const shell = document.getElementById('device-shell');
+  if (!stage || !shell) return;
+  shell.style.transform = 'scale(1)';
+  shell.style.marginBottom = '0px';
+  const sw = stage.clientWidth - 24, sh = stage.clientHeight - 56;
+  const nw = shell.offsetWidth, nh = shell.offsetHeight;
+  const scale = Math.min(1, sw / nw, sh / nh);
+  shell.style.transform = `scale(${scale})`;
+  shell.style.marginBottom = `${-(nh * (1 - scale))}px`;  // collapse empty space below
+}
+window.addEventListener('resize', () => { if (currentPage === 'preview') fitPreview(); });
+
+// ── Render result ──
+function renderCurrentResult(){
+  if (_result) renderResult(_result);
+  else document.getElementById('main').innerHTML =
+    '<div class="empty-state"><div class="icon">🔦</div><h2>웹 페이지 품질 분석</h2><p>URL을 입력하고 분석을 시작하세요.</p></div>';
+}
+
+function renderResult(r){
+  const cats = Object.keys(r.categories);
+  const scoresHtml = cats.map(k => {
+    const cat = r.categories[k];
+    return `<div class="score-card${k===activeAuditTab?' active':''}" onclick="setAuditTab('${k}')">${gauge(cat.score)}<div class="score-title">${CAT_LABELS[k]||cat.title}</div></div>`;
+  }).join('');
+
+  const metricsHtml = r.categories.performance
+    ? Object.entries(r.metrics).map(([id,m]) => {
+        const meta = METRIC_META[id]||{label:id,icon:'📊'}; const cls = scoreClass(m.score);
+        return `<div class="metric-card"><div class="metric-icon bg-${cls}">${meta.icon}</div><div><div class="metric-name">${meta.label}</div><div class="metric-val ${cls}">${m.displayValue||'-'}</div></div></div>`;
+      }).join('') : '';
+
+  const tabsHtml = cats.map(k => `<button class="tab-btn${k===activeAuditTab?' active':''}" onclick="setAuditTab('${k}')">${CAT_LABELS[k]||k}</button>`).join('');
+  const date = new Date(r.fetchTime).toLocaleString('ko-KR');
+
+  document.getElementById('main').innerHTML = `
+    <div class="result-header">
+      <div class="result-url">${r.url}</div>
+      <span class="badge">${DEV_ICONS[r.device]||'🖥'} ${r.deviceLabel||r.device}</span>
+      ${r.session?`<span class="badge" style="color:var(--good)">⬢ ${r.session}</span>`:''}
+      ${r.reportId?`<span class="badge" id="save-badge" title="R2 저장됨">☁ 저장됨</span>`:''}
+      <span class="badge">${date}</span>
+      <button class="btn btn-ghost btn-sm" onclick="downloadMarkdown()" title="마크다운 리포트 다운로드">⬇ 마크다운</button>
+    </div>
+    <div id="field-section"></div>
+    <div class="section-title">점수</div>
+    <div class="scores-grid">${scoresHtml}</div>
+    ${metricsHtml?`<div class="section-title">핵심 지표</div><div class="metrics-grid">${metricsHtml}</div>`:''}
+    <div class="tabs">${tabsHtml}</div>
+    <div id="audits-body"></div>`;
+  renderAudits(r);
+  loadFieldData(r.url, r.device);
+}
+
+// ── Field data (CrUX) ──
+const FIELD_META = {
+  lcp:  { label:'LCP',  sub:'최대 콘텐츠 렌더링', fmt:'sec' },
+  inp:  { label:'INP',  sub:'상호작용 반응성',   fmt:'ms'  },
+  cls:  { label:'CLS',  sub:'누적 레이아웃 이동', fmt:'cls' },
+  fcp:  { label:'FCP',  sub:'첫 콘텐츠 표시',     fmt:'sec' },
+  ttfb: { label:'TTFB', sub:'최초 바이트 응답',   fmt:'sec' },
+};
+function fmtField(v, fmt){
+  if (fmt==='cls') return (v||0).toFixed(2);
+  if (fmt==='ms')  return `${Math.round(v)} ms`;
+  return v>=1000 ? `${(v/1000).toFixed(1)} s` : `${Math.round(v)} ms`;
+}
+function ratingColor(r){ return r==='good'?'var(--good)':r==='ni'?'var(--warn)':r==='poor'?'var(--poor)':'var(--muted)'; }
+async function loadFieldData(url, device){
+  const el = document.getElementById('field-section'); if (!el) return;
+  try {
+    const res = await fetch(`${getApiBase()}/field?url=${encodeURIComponent(url)}&device=${device||'pc'}`, { signal: AbortSignal.timeout(15000) });
+    el.innerHTML = renderFieldData(await res.json());
+  } catch { el.innerHTML = ''; }
+}
+function renderFieldData(f){
+  if (!f || !f.available){
+    if (f && f.reason==='no-key')
+      return `<div class="field-hint">💡 <b>실제 사용자 데이터(CrUX)</b> — PageSpeed Insights처럼 실제 방문자의 Core Web Vitals를 보려면 서버에 <code>CRUX_API_KEY</code>를 설정하세요. (Google Cloud → Chrome UX Report API 키 발급)</div>`;
+    if (f && f.reason==='no-data')
+      return `<div class="field-hint">📊 이 URL은 <b>실제 사용자 데이터(CrUX)</b>가 충분하지 않습니다. 방문자 수가 적은 사이트는 Google이 필드 데이터를 제공하지 않습니다. (아래는 Lighthouse 랩 데이터입니다)</div>`;
+    return '';
+  }
+  const order = ['lcp','inp','cls','fcp','ttfb'];
+  const cards = order.filter(k => f.metrics[k]).map(k => {
+    const m = f.metrics[k], meta = FIELD_META[k];
+    return `<div class="fmetric">
+      <div class="fm-top"><div><span class="fm-name">${meta.label}</span> <span class="fm-sub">${meta.sub}</span></div>
+        <span class="fm-val" style="color:${ratingColor(m.rating)}">${fmtField(m.p75, meta.fmt)}</span></div>
+      <div class="fm-bar"><span style="width:${m.good}%;background:var(--good)"></span><span style="width:${m.ni}%;background:var(--warn)"></span><span style="width:${m.poor}%;background:var(--poor)"></span></div>
+      <div class="fm-legend"><span><i class="fm-dot" style="background:var(--good)"></i>양호 ${m.good}%</span><span><i class="fm-dot" style="background:var(--warn)"></i>개선 ${m.ni}%</span><span><i class="fm-dot" style="background:var(--poor)"></i>불량 ${m.poor}%</span></div>
+    </div>`;
+  }).join('');
+  const scopeLabel = f.scope==='origin' ? '출처(origin) 전체' : '이 페이지';
+  return `<div class="field-section">
+    <div class="field-head">
+      <span class="field-title">📊 실제 사용자 환경 (CrUX · 최근 28일)</span>
+      <span class="field-scope">${scopeLabel} · ${f.formFactor==='DESKTOP'?'데스크톱':'모바일'}</span>
+      <span class="cwv-badge ${f.assessment}">Core Web Vitals ${f.assessment==='pass'?'통과 ✓':'실패 ✕'}</span>
+    </div>
+    <div class="field-grid">${cards}</div>
+  </div>`;
+}
+
+function setAuditTab(tab){
+  activeAuditTab = tab;
+  document.querySelectorAll('.score-card').forEach(c => {
+    const k = c.querySelector('.score-title')?.textContent;
+    c.classList.toggle('active', Object.entries(CAT_LABELS).some(([ck,cv]) => cv===k && ck===tab));
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.textContent === (CAT_LABELS[tab]||tab)));
+  if (_result) renderAudits(_result);
+}
+
+function renderAudits(r){
+  const cat = r.categories[activeAuditTab];
+  const body = document.getElementById('audits-body');
+  if (!cat || !body) return;
+  const failed=[],passed=[],na=[];
+  cat.auditRefs.forEach(id => {
+    const a = r.audits[id]; if (!a) return;
+    if (a.scoreDisplayMode==='notApplicable'||a.scoreDisplayMode==='manual') na.push(a);
+    else if (a.score===null||a.score>=0.9) passed.push(a);
+    else failed.push(a);
+  });
+  let html='';
+  if (failed.length){ html += `<div class="audit-section-label">개선 필요 (${failed.length})</div>${failed.map(auditHtml).join('')}<div class="audit-section-label" style="margin-top:18px">통과 (${passed.length})</div>`; }
+  else { html += `<div class="audit-section-label">통과 (${passed.length})</div>`; }
+  html += passed.map(auditHtml).join('');
+  if (na.length) html += `<div class="audit-section-label" style="margin-top:18px">해당 없음 (${na.length})</div>${na.map(auditHtml).join('')}`;
+  body.innerHTML = html;
+}
+
+function auditHtml(a){
+  const icon = a.scoreDisplayMode==='notApplicable'?'⬛':a.scoreDisplayMode==='manual'?'ℹ️':a.score===null?'⬛':a.score>=0.9?'✅':a.score>=0.5?'🟡':'🔴';
+  return `<div class="audit-item"><div class="audit-row" onclick="this.closest('.audit-item').classList.toggle('open')">
+    <span class="audit-icon-cell">${icon}</span><span class="audit-name">${a.title}</span>
+    <span class="audit-val">${a.displayValue||''}</span><span class="audit-chevron">▼</span></div>
+    <div class="audit-body">${mdToHtml(a.description||'')}${buildTable(a.details)}</div></div>`;
+}
+
+function buildTable(details){
+  if (!details || details.type!=='table' || !details.items?.length) return '';
+  const heads = details.headings||[]; if (!heads.length) return '';
+  let h='<table class="audit-table"><thead><tr>';
+  heads.forEach(hd => h += `<th>${hd.label||hd.key||''}</th>`);
+  h+='</tr></thead><tbody>';
+  details.items.slice(0,10).forEach(row => {
+    h+='<tr>';
+    heads.forEach(hd => {
+      const v = row[hd.key]; let cell='-';
+      if (v!=null){
+        if (typeof v==='object'&&v.type==='url') cell = `<a href="${v.value}" target="_blank" style="color:var(--accent)">${v.value}</a>`;
+        else if (typeof v==='object'&&v.type==='bytes') cell = fmtBytes(v.value);
+        else if (typeof v==='object'&&v.type==='ms') cell = `${Math.round(v.value)} ms`;
+        else if (typeof v==='object') cell = v.value ?? JSON.stringify(v);
+        else cell = String(v);
+      }
+      h+=`<td>${cell}</td>`;
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  if (details.items.length>10) h += `<div style="font-size:11px;color:var(--muted);margin-top:4px">+ ${details.items.length-10}개 더</div>`;
+  return h;
+}
+
+// ── Reports page (Firestore) ──
+async function renderReportsPage(){
+  const main = document.getElementById('main');
+  if (!window.LH_DB){
+    main.innerHTML = `<div class="reports-page"><div class="no-storage">
+      <b>⏳ Firebase 초기화 중...</b><br><br>잠시 후 다시 시도하거나, 네트워크 연결을 확인하세요.</div></div>`;
+    setTimeout(() => { if (window.LH_DB && currentPage==='reports') renderReportsPage(); }, 800);
+    return;
+  }
+  main.innerHTML = '<div class="loading"><div class="spinner"></div><div>리포트 불러오는 중...</div></div>';
+  try {
+    const urlSession = new URLSearchParams(location.search).get('session') || '';
+    const [reports, sessions] = await Promise.all([window.LH_DB.list(urlSession || null), window.LH_DB.sessions()]);
+    window._reports = reports;
+    let sessOpts = `<option value=""${urlSession?'':' selected'}>전체 세션</option>` +
+      sessions.map(s => `<option value="${s}"${s===urlSession?' selected':''}>${s}</option>`).join('');
+    let html = `<div class="reports-page">
+      <div class="reports-top">
+        <h2 style="font-size:16px;font-weight:700">☁ 저장된 리포트</h2>
+        <select class="session-filter" id="sess-filter" onchange="filterBySession(this.value)">${sessOpts}</select>
+        <input class="search-input" type="search" placeholder="🔍 URL 검색..." oninput="filterReports(this.value)"/>
+        <span style="font-size:12px;color:var(--muted);margin-left:auto" id="rep-count">${reports.length}개</span>
+      </div>
+      <div id="report-list">${reports.length ? reports.map(reportCardHtml).join('') :
+        '<div style="color:var(--muted);font-size:13px;padding:20px 0">저장된 리포트가 없습니다. 세션을 켜고 분석하면 여기에 저장됩니다.</div>'}</div>
+    </div>`;
+    main.innerHTML = html;
+  } catch(err){
+    main.innerHTML = `<div class="error-box">리포트를 불러오지 못했습니다.<br><br>${err.message}<br><br>Firestore 보안 규칙을 확인하세요.</div>`;
+  }
+}
+
+function reportCardHtml(r){
+  const scores = Object.entries(r.scores||{}).map(([k,s]) =>
+    `<span class="rc-score ${scoreClass(s)}" title="${CAT_LABELS[k]||k}">${Math.round((s||0)*100)}</span>`).join('');
+  const ts = r.fetchTime ? new Date(r.fetchTime).toLocaleString('ko-KR') : '';
+  return `<div class="report-card" data-url="${(r.url||'').toLowerCase()}" data-session="${r.session||''}" onclick="viewReport('${r.id}')">
+    <div class="rc-info">
+      <div class="rc-url">${r.url}</div>
+      <div class="rc-meta"><span>${DEV_ICONS[r.device]||'🖥'} ${r.deviceLabel||r.device}</span>${r.session?`<span class="rc-session">${r.session}</span>`:''}<span>${ts}</span></div>
+    </div>
+    <div class="rc-scores">${scores}</div></div>`;
+}
+
+window.filterReports = function(q){
+  q = q.toLowerCase();
+  document.querySelectorAll('.report-card').forEach(el => {
+    el.style.display = (el.dataset.url||'').includes(q) ? '' : 'none';
+  });
+};
+window.filterBySession = async function(sess){
+  const main = document.getElementById('main');
+  const listEl = document.getElementById('report-list');
+  listEl.innerHTML = '<div style="color:var(--muted);padding:20px 0">불러오는 중...</div>';
+  const reports = await window.LH_DB.list(sess || null);
+  window._reports = reports;
+  document.getElementById('rep-count').textContent = `${reports.length}개`;
+  listEl.innerHTML = reports.length ? reports.map(reportCardHtml).join('')
+    : '<div style="color:var(--muted);font-size:13px;padding:20px 0">해당 세션의 리포트가 없습니다.</div>';
+};
+
+async function viewReport(id){
+  const r = (window._reports||[]).find(x => x.id === id);
+  if (!r) return;
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="loading"><div class="spinner"></div><div>리포트 불러오는 중...</div></div>';
+
+  let full = null;
+  // try R2 full report via server
+  if (r.reportId){
+    try {
+      const res = await fetch(`${getApiBase()}/reports/${r.reportId}`, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) full = await res.json();
+    } catch {}
+  }
+  const data = full || r.result;
+  if (!data){ main.innerHTML = '<div class="error-box">리포트 데이터를 찾을 수 없습니다.</div>'; return; }
+  data.session = r.session;
+  _result = data;
+  activeAuditTab = Object.keys(data.categories)[0] || 'performance';
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.toggle('active', t.dataset.page === 'home'));
+  currentPage = 'home';
+  renderResult(data);
+}
+
+// ── Markdown link → HTML (Lighthouse 설명은 마크다운 링크 포함) ──
+function mdToHtml(t){
+  if (!t) return '';
+  return t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" style="color:var(--accent)">$1</a>');
+}
+
+// ── 마크다운 리포트 생성/다운로드 ──
+function downloadMarkdown(){
+  if (!_result) return;
+  const md = toMarkdown(_result);
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const host = (() => { try { return new URL(_result.url).hostname; } catch { return 'report'; } })();
+  const ts = new Date(_result.fetchTime).toISOString().slice(0,16).replace(/[:T]/g,'-');
+  a.download = `lighthouse_${host}_${_result.device}_${ts}.md`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+function toMarkdown(r){
+  const pct = s => s==null ? '-' : Math.round(s*100);
+  const emoji = s => s==null ? '⬜' : s>=0.9 ? '🟢' : s>=0.5 ? '🟠' : '🔴';
+  const date = new Date(r.fetchTime).toLocaleString('ko-KR');
+  let md = `# Lighthouse 리포트\n\n`;
+  md += `- **URL**: ${r.url}\n`;
+  md += `- **장치**: ${r.deviceLabel || r.device}\n`;
+  if (r.session) md += `- **세션**: ${r.session}\n`;
+  md += `- **분석 시각**: ${date}\n\n`;
+
+  // 점수 요약
+  md += `## 점수 요약\n\n| 카테고리 | 점수 |\n|---|---|\n`;
+  for (const [k,c] of Object.entries(r.categories))
+    md += `| ${CAT_LABELS[k]||c.title} | ${emoji(c.score)} ${pct(c.score)} |\n`;
+  md += `\n`;
+
+  // 핵심 지표
+  if (r.metrics && Object.keys(r.metrics).length){
+    md += `## 핵심 지표\n\n| 지표 | 값 |\n|---|---|\n`;
+    for (const [id,m] of Object.entries(r.metrics)){
+      const meta = METRIC_META[id] || { label: id };
+      md += `| ${meta.label} (${m.title}) | ${m.displayValue || '-'} |\n`;
+    }
+    md += `\n`;
+  }
+
+  // 카테고리별 상세
+  for (const [k,c] of Object.entries(r.categories)){
+    md += `## ${CAT_LABELS[k]||c.title} (${emoji(c.score)} ${pct(c.score)})\n\n`;
+    const failed=[], passed=[], na=[];
+    c.auditRefs.forEach(id => {
+      const a = r.audits[id]; if (!a) return;
+      if (a.scoreDisplayMode==='notApplicable'||a.scoreDisplayMode==='manual') na.push(a);
+      else if (a.score===null || a.score>=0.9) passed.push(a);
+      else failed.push(a);
+    });
+
+    if (failed.length){
+      md += `### 🔧 개선 필요 (${failed.length})\n\n`;
+      failed.forEach(a => { md += auditMd(a); });
+    }
+    if (passed.length){
+      md += `### ✅ 통과 (${passed.length})\n\n`;
+      passed.forEach(a => { md += auditMd(a); });
+    }
+    if (na.length){
+      md += `### ⬜ 해당 없음 (${na.length})\n\n`;
+      na.forEach(a => { md += `- **${a.title}**\n`; });
+      md += `\n`;
+    }
+  }
+
+  md += `\n---\n*Generated by Lighthouse UI · lh.sanghak.kr*\n`;
+  return md;
+}
+
+function auditMd(a){
+  const icon = a.score===null ? '⬜' : a.score>=0.9 ? '🟢' : a.score>=0.5 ? '🟠' : '🔴';
+  let s = `#### ${icon} ${a.title}${a.displayValue ? ` — ${a.displayValue}` : ''}\n\n`;
+  if (a.description) s += `${a.description.trim()}\n\n`;
+  // 상세 표
+  const d = a.details;
+  if (d && d.type==='table' && d.items?.length && d.headings?.length){
+    const heads = d.headings;
+    s += `| ${heads.map(h => h.label||h.key||'').join(' | ')} |\n`;
+    s += `| ${heads.map(()=>'---').join(' | ')} |\n`;
+    d.items.slice(0,15).forEach(row => {
+      const cells = heads.map(h => {
+        const v = row[h.key];
+        if (v==null) return '-';
+        if (typeof v==='object'){
+          if (v.type==='url') return v.value;
+          if (v.type==='bytes') return fmtBytes(v.value);
+          if (v.type==='ms') return `${Math.round(v.value)} ms`;
+          return String(v.value ?? '').replace(/\|/g,'\\|').replace(/\n/g,' ');
+        }
+        return String(v).replace(/\|/g,'\\|').replace(/\n/g,' ');
+      });
+      s += `| ${cells.join(' | ')} |\n`;
+    });
+    if (d.items.length>15) s += `\n_+ ${d.items.length-15}개 더_\n`;
+    s += `\n`;
+  }
+  return s;
+}
+
+// ── Helpers ──
+function scoreClass(s){ if (s==null) return 'na'; if (s>=0.9) return 'good'; if (s>=0.5) return 'warn'; return 'poor'; }
+function scoreColor(s){ const c = scoreClass(s); return c==='good'?'var(--good)':c==='warn'?'var(--warn)':c==='poor'?'var(--poor)':'var(--muted)'; }
+function gauge(score){
+  const pct = score==null?0:Math.round(score*100);
+  const r=33, circ=2*Math.PI*r, dash=(pct/100)*circ, color=scoreColor(score);
+  return `<div class="gauge"><svg viewBox="0 0 80 80" width="80" height="80">
+    <circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="5"/>
+    <circle cx="40" cy="40" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-dasharray="${dash} ${circ}" stroke-linecap="round"/>
+    </svg><div class="gauge-num ${scoreClass(score)}">${score==null?'-':pct}</div></div>`;
+}
+function fmtBytes(b){ if (!b) return '0 B'; const i=Math.floor(Math.log(b)/Math.log(1024)); return `${(b/Math.pow(1024,i)).toFixed(1)} ${['B','KB','MB'][i]||'B'}`; }
+</script>
+</body>
+</html>
