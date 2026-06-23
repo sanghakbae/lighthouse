@@ -182,10 +182,10 @@ function proxifyHtml(html, finalUrl) {
   const origin = new URL(finalUrl).origin;
   const baseTag = `<base href="/p/${finalUrl}">`;
   // 절대경로(/assets/..) → /p/<origin>/assets/.. , 프로토콜상대(//host) → /p/https://host
-  html = html.replace(/\b(src|href)=("|')(\/[^"'>]*)\2/gi, (m, a, q, v) =>
+  html = html.replace(/\b(src|href|action)=("|')(\/[^"'>]*)\2/gi, (m, a, q, v) =>
     v.startsWith('//') ? `${a}=${q}/p/https:${v}${q}` : `${a}=${q}/p/${origin}${v}${q}`);
   // 동일출처 절대 URL(https://origin/..) → /p/https://origin/..
-  const originRe = new RegExp(`\\b(src|href)=("|')(${origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"'>]*)\\2`, 'gi');
+  const originRe = new RegExp(`\\b(src|href|action)=("|')(${origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"'>]*)\\2`, 'gi');
   html = html.replace(originRe, (m, a, q, v) => `${a}=${q}/p/${v}${q}`);
   // 런타임 fetch/XHR을 프록시로 우회
   const inject = `<script>(function(){var O=${JSON.stringify(origin)},B=${JSON.stringify(finalUrl)};` +
@@ -199,25 +199,74 @@ function proxifyHtml(html, finalUrl) {
   return html;
 }
 
-async function proxyFetchAndSend(target, cookie, ua, res, isEntry) {
+// 쿠키 jar 헬퍼 (lhpx 쿠키에 세션 누적 → 로그인 흐름 유지)
+function parseCookiePairs(s) {
+  const map = {};
+  (s || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > 0) map[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
+  return map;
+}
+function serializeCookieMap(m) {
+  return Object.entries(m).map(([k, v]) => `${k}=${v}`).join('; ');
+}
+function readJar(req) {
+  const m = (req.headers.cookie || '').match(/lhpx=([^;]+)/);
+  if (!m) return {};
+  try { return parseCookiePairs(Buffer.from(m[1], 'base64').toString()); } catch { return {}; }
+}
+function extractSetCookies(r) {
+  const out = {};
+  const arr = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [];
+  for (const sc of arr) {
+    const first = (sc || '').split(';')[0]; const i = first.indexOf('=');
+    if (i > 0) out[first.slice(0, i).trim()] = first.slice(i + 1).trim();
+  }
+  return out;
+}
+
+// 모든 메서드 지원 프록시 (GET/POST/...). 본문·쿠키 전달, 리다이렉트 재작성.
+const rawBody = express.raw({ type: () => true, limit: '25mb' });
+async function proxyForward(req, res, target, ua, isEntry) {
+  const jar = readJar(req);
+  if (isEntry && req.query.cookie) Object.assign(jar, parseCookiePairs(req.query.cookie)); // 진입 시 주입 쿠키 병합
+
   const headers = {
     'User-Agent': ua || DESKTOP_UA,
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept': req.headers['accept'] || 'text/html,application/xhtml+xml,*/*;q=0.8',
     'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
     'Referer': target,
   };
-  if (cookie) headers.Cookie = cookie;
-  const r = await fetch(target, { headers, redirect: 'follow' });
-  const ct = r.headers.get('content-type') || '';
-  res.set('Cache-Control', 'no-store');
-  if (isEntry) {
-    const origin = new URL(r.url || target).origin;
-    res.set('Set-Cookie', [
-      cookie ? `lhpx=${Buffer.from(cookie).toString('base64')}; Path=/; SameSite=Lax`
-             : 'lhpx=; Path=/; Max-Age=0',
-      `lhpo=${Buffer.from(origin).toString('base64')}; Path=/; SameSite=Lax`,  // 캐치올 프록시용 대상 origin
-    ]);
+  const cookieStr = serializeCookieMap(jar);
+  if (cookieStr) headers.Cookie = cookieStr;
+
+  let body;
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type'];
+    if (Buffer.isBuffer(req.body) && req.body.length) body = req.body;          // raw (폼/멀티파트)
+    else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length) body = JSON.stringify(req.body); // express.json이 파싱한 경우
+    else if (typeof req.body === 'string' && req.body) body = req.body;
   }
+
+  const r = await fetch(target, { method: req.method, headers, body, redirect: 'manual' });
+
+  // 응답 Set-Cookie를 jar에 누적 (로그인 세션 establishment)
+  const setck = extractSetCookies(r);
+  const jarChanged = Object.keys(setck).length > 0;
+  if (jarChanged) Object.assign(jar, setck);
+
+  const outCookies = [];
+  if (isEntry) outCookies.push(`lhpo=${Buffer.from(new URL(target).origin).toString('base64')}; Path=/; SameSite=Lax`);
+  if (isEntry || jarChanged) outCookies.push(`lhpx=${Buffer.from(serializeCookieMap(jar)).toString('base64')}; Path=/; SameSite=Lax`);
+  if (outCookies.length) res.set('Set-Cookie', outCookies);
+  res.set('Cache-Control', 'no-store');
+
+  // 리다이렉트 → Location을 프록시 경로로 재작성 (브라우저가 프록시 안에서 따라가게)
+  if (r.status >= 300 && r.status < 400) {
+    const loc = r.headers.get('location');
+    if (loc) { res.status(r.status).set('Location', '/p/' + new URL(loc, target).href); return res.end(); }
+  }
+
+  const ct = r.headers.get('content-type') || '';
+  res.status(r.status);
   if (ct.includes('text/html')) {
     const html = await r.text();
     res.set('Content-Type', 'text/html; charset=utf-8');
@@ -228,24 +277,21 @@ async function proxyFetchAndSend(target, cookie, ua, res, isEntry) {
   return res.send(buf);
 }
 
-// 진입점: HTML 페이지 (세션 쿠키/디바이스 적용 + 쿠키를 우리 origin에 저장)
-app.get('/proxy', async (req, res) => {
-  let { url, device = 'pc', cookie = '' } = req.query;
+// 진입점: HTML 페이지 (세션 쿠키/디바이스 적용)
+app.all('/proxy', rawBody, async (req, res) => {
+  let { url, device = 'pc' } = req.query;
   if (!url) return res.status(400).send('url required');
   if (!/^https?:\/\//.test(url)) url = 'https://' + url;
   const d = SHOT_DEVICES[device] || SHOT_DEVICES.pc;
-  try { await proxyFetchAndSend(url, cookie, d.ua, res, true); }
+  try { await proxyForward(req, res, url, d.ua, true); }
   catch (e) { res.status(502).send(`<div style="font-family:sans-serif;padding:24px;color:#f85149">실시간 프록시 로드 실패: ${e.message}</div>`); }
 });
 
-// 하위 리소스: /p/<실제 URL> (상대경로가 올바르게 해석되도록 경로 구조 보존)
-app.get(/^\/p\//, async (req, res) => {
+// 하위 리소스/폼 제출: /p/<실제 URL> (상대경로 해석되도록 경로 구조 보존, 모든 메서드)
+app.all(/^\/p\//, rawBody, async (req, res) => {
   const target = req.originalUrl.slice(3); // '/p/' 제거 → https://host/path?query
   if (!/^https?:\/\//.test(target)) return res.status(400).send('bad target');
-  let cookie = '';
-  const m = (req.headers.cookie || '').match(/lhpx=([^;]+)/);
-  if (m) { try { cookie = Buffer.from(m[1], 'base64').toString(); } catch {} }
-  try { await proxyFetchAndSend(target, cookie, DESKTOP_UA, res, false); }
+  try { await proxyForward(req, res, target, DESKTOP_UA, false); }
   catch (e) { res.status(502).send('proxy error: ' + e.message); }
 });
 
@@ -340,7 +386,7 @@ function buildResult(lhr, device, deviceLabel) {
 
 // ── 캐치올 프록시: 프록시 페이지에서 발생한 절대경로 요청을 실제 사이트로 전달 ──
 // (React가 런타임에 만든 <img src="/icon.svg">, 동적 청크, /api 호출 등을 자동 처리)
-app.get(/.*/, async (req, res, next) => {
+app.all(/.*/, rawBody, async (req, res, next) => {
   const ref = req.headers.referer || '';
   if (!/\/(proxy\?|p\/)/.test(ref)) return next();        // 프록시 iframe에서 온 요청만
   const mo = (req.headers.cookie || '').match(/lhpo=([^;]+)/);
@@ -348,10 +394,7 @@ app.get(/.*/, async (req, res, next) => {
   let origin = '';
   try { origin = Buffer.from(mo[1], 'base64').toString(); } catch { return next(); }
   if (!/^https?:\/\//.test(origin)) return next();
-  let cookie = '';
-  const mc = (req.headers.cookie || '').match(/lhpx=([^;]+)/);
-  if (mc) { try { cookie = Buffer.from(mc[1], 'base64').toString(); } catch {} }
-  try { await proxyFetchAndSend(origin + req.originalUrl, cookie, DESKTOP_UA, res, false); }
+  try { await proxyForward(req, res, origin + req.originalUrl, DESKTOP_UA, false); }
   catch { next(); }
 });
 
