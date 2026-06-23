@@ -37,7 +37,7 @@ Chrome DevTools Lighthouse와 유사한 웹 성능 분석 도구.
 - **분석 실행**: 로컬 Node 서버(Chrome headless). GitHub Pages에선 ⚙ 설정에서 서버 URL 연결.
 - **저장**: Firestore를 클라이언트에서 직접 사용 (서버 스토리지 키 불필요). 별도 S3/R2 없음.
 
-## 빠른 시작
+## 빠른 시작 (로컬)
 
 ```bash
 git clone https://github.com/sanghakbae/lighthouse
@@ -46,6 +46,32 @@ npm install
 cp .env.example .env   # CrUX 키 입력 (선택)
 npm start              # http://localhost:3000
 ```
+
+## 분석 서버 클라우드 배포 (로컬 없이 사용)
+
+GitHub Pages는 정적 호스팅이라 헤드리스 Chrome을 못 돌립니다. 분석 서버를 컨테이너로
+올리면 로컬 서버 없이 배포 페이지에서 바로 분석할 수 있습니다. ([Dockerfile](Dockerfile) 포함)
+
+**옵션 A — Render** ([render.yaml](render.yaml))
+1. [Render](https://render.com) → New + → **Blueprint** → 이 레포 연결 (render.yaml 자동 인식)
+2. (선택) 환경변수 `CRUX_API_KEY` 입력 → Deploy
+3. 배포 URL(예: `https://lighthouse-server.onrender.com`)을 프론트엔드 ⚙ 설정의 **API 서버 URL**에 입력
+
+**옵션 B — Fly.io** ([fly.toml](fly.toml))
+```bash
+fly launch --no-deploy   # 앱 이름 확인
+fly deploy
+fly secrets set CRUX_API_KEY=...   # 선택
+```
+
+**옵션 C — 직접 Docker**
+```bash
+docker build -t lighthouse-server .
+docker run -p 3000:3000 -e CRUX_API_KEY=... lighthouse-server
+```
+
+> 메모리: 헤드리스 Chrome은 메모리를 많이 써서 **1GB 이상** 권장 (Render starter / Fly 1gb).
+> ⚠️ 공개 배포 시 `/proxy`·`/screenshot`이 오픈 프록시가 되므로, 접근 제어(토큰/IP 제한)를 두는 것을 권장합니다.
 
 ## 실제 사용자 데이터 (CrUX / PageSpeed Insights 필드 데이터)
 

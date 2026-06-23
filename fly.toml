@@ -1,0 +1,25 @@
+# Fly.io 설정 — `fly launch --no-deploy` 후 `fly deploy`
+app = "lighthouse-server"
+primary_region = "nrt"   # 도쿄 (한국에서 가까움)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[http_service.checks]
+  [http_service.checks.health]
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+
+[[vm]]
+  # 헤드리스 Chrome은 메모리를 많이 쓰므로 1GB 이상 권장
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

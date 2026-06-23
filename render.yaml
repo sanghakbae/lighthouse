@@ -1,0 +1,11 @@
+# Render.com Blueprint — 대시보드에서 "New + → Blueprint"로 이 레포 연결 시 자동 사용
+services:
+  - type: web
+    name: lighthouse-server
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter            # 헤드리스 Chrome은 메모리를 쓰므로 free보다 starter 권장
+    healthCheckPath: /health
+    envVars:
+      - key: CRUX_API_KEY    # 선택: CrUX 실제 사용자 데이터
+        sync: false

@@ -9,6 +9,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 리포트 저장은 클라이언트에서 Firebase Firestore로 직접 처리 (서버 측 스토리지 없음)
 
+// 헤드리스 Chrome 실행 플래그 (컨테이너 환경 대응: --no-sandbox, --disable-dev-shm-usage)
+const CHROME_FLAGS = ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'];
+
 // ── Device configurations ──────────────────────────────────────────────────
 const DEVICES = {
   iphone: {
@@ -151,7 +154,7 @@ app.get('/screenshot', async (req, res) => {
   let chrome, browser;
   try {
     const chromeLauncher = await import('chrome-launcher');
-    chrome = await chromeLauncher.launch({ chromeFlags: ['--headless', '--no-sandbox', '--disable-gpu', '--hide-scrollbars'] });
+    chrome = await chromeLauncher.launch({ chromeFlags: [...CHROME_FLAGS, '--hide-scrollbars'], chromePath: process.env.CHROME_PATH || undefined });
     const puppeteer = (await import('puppeteer-core')).default;
     browser = await puppeteer.connect({ browserURL: `http://localhost:${chrome.port}`, defaultViewport: null });
 
@@ -311,7 +314,7 @@ app.post('/audit', async (req, res) => {
   try {
     send({ type: 'status', message: 'Chrome 실행 중...' });
     const chromeLauncher = await import('chrome-launcher');
-    chrome = await chromeLauncher.launch({ chromeFlags: ['--headless', '--no-sandbox', '--disable-gpu'] });
+    chrome = await chromeLauncher.launch({ chromeFlags: CHROME_FLAGS, chromePath: process.env.CHROME_PATH || undefined });
 
     send({ type: 'status', message: '페이지 분석 중...' });
     const lighthouse = (await import('lighthouse')).default;
