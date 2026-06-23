@@ -3,71 +3,11 @@ import cors from 'cors';
 import { createRequire } from 'module';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { S3Client, PutObjectCommand, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ── S3 / Cloudflare R2 client ──────────────────────────────────────────────
-function createStorageClient() {
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
-  if (!accessKeyId || !secretAccessKey) return null;
-
-  const config = {
-    region: process.env.AWS_REGION || 'auto',
-    credentials: { accessKeyId, secretAccessKey },
-  };
-
-  // Cloudflare R2: custom endpoint
-  const accountId = process.env.CF_ACCOUNT_ID || '02f0426678a5977483be4b2210cdf293';
-  const r2Endpoint = process.env.R2_ENDPOINT;
-  // Only treat as R2 when R2_* keys are used (account default always present)
-  if (process.env.R2_ACCESS_KEY_ID || r2Endpoint) {
-    config.endpoint = r2Endpoint || `https://${accountId}.r2.cloudflarestorage.com`;
-    config.region = 'auto';
-  }
-
-  return new S3Client(config);
-}
-
-const storage = createStorageClient();
-const BUCKET = process.env.R2_BUCKET || process.env.S3_BUCKET || 'lighthouse';
-
-async function saveReport(reportId, data) {
-  if (!storage) return null;
-  await storage.send(new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: `reports/${reportId}.json`,
-    Body: JSON.stringify(data),
-    ContentType: 'application/json',
-  }));
-  return reportId;
-}
-
-async function listReports() {
-  if (!storage) return [];
-  const res = await storage.send(new ListObjectsV2Command({
-    Bucket: BUCKET,
-    Prefix: 'reports/',
-    MaxKeys: 100,
-  }));
-  return (res.Contents || []).map(o => ({
-    id: o.Key.replace('reports/', '').replace('.json', ''),
-    size: o.Size,
-    lastModified: o.LastModified,
-  }));
-}
-
-async function getReport(reportId) {
-  const res = await storage.send(new GetObjectCommand({
-    Bucket: BUCKET,
-    Key: `reports/${reportId}.json`,
-  }));
-  const chunks = [];
-  for await (const chunk of res.Body) chunks.push(chunk);
-  return JSON.parse(Buffer.concat(chunks).toString());
-}
+// 리포트 저장은 클라이언트에서 Firebase Firestore로 직접 처리 (서버 측 스토리지 없음)
 
 // ── Device configurations ──────────────────────────────────────────────────
 const DEVICES = {
@@ -126,8 +66,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
-    storage: storage ? 'connected' : 'disabled',
-    bucket: storage ? BUCKET : null,
     field: process.env.CRUX_API_KEY ? 'enabled' : 'disabled',
   });
 });
@@ -313,7 +251,7 @@ app.get(/^\/p\//, async (req, res) => {
 
 // ── Audit (SSE streaming) ──────────────────────────────────────────────────
 app.post('/audit', async (req, res) => {
-  let { url, categories, device = 'pc', saveToStorage = false, cookie = '' } = req.body;
+  let { url, categories, device = 'pc', cookie = '' } = req.body;
 
   if (!url) return res.status(400).json({ error: 'URL is required' });
   if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
@@ -350,54 +288,13 @@ app.post('/audit', async (req, res) => {
     const lhr = runnerResult.lhr;
     const result = buildResult(lhr, device, deviceCfg.label);
 
-    // Save to S3/R2
-    let reportId = null;
-    if (saveToStorage && storage) {
-      send({ type: 'status', message: '리포트 저장 중...' });
-      const ts = new Date().toISOString().replace(/[:.]/g, '-');
-      const slug = new URL(lhr.finalDisplayedUrl).hostname.replace(/\./g, '-');
-      reportId = `${slug}__${device}__${ts}`;
-      await saveReport(reportId, { ...result, fullAudits: lhr.audits });
-    }
-
-    send({ type: 'result', data: { ...result, reportId } });
+    // 저장은 클라이언트가 Firestore로 처리
+    send({ type: 'result', data: result });
   } catch (err) {
     send({ type: 'error', message: err.message });
   } finally {
     if (chrome) await chrome.kill();
     res.end();
-  }
-});
-
-// ── Reports ────────────────────────────────────────────────────────────────
-app.get('/reports', async (_req, res) => {
-  if (!storage) return res.json({ reports: [], storageEnabled: false });
-  try {
-    const list = await listReports();
-    // Parse metadata from key: {slug}__{device}__{ts}
-    const reports = list.map(item => {
-      const parts = item.id.split('__');
-      return {
-        id: item.id,
-        urlSlug: parts[0] || '',
-        device: parts[1] || '',
-        timestamp: item.lastModified,
-        size: item.size,
-      };
-    }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    res.json({ reports, storageEnabled: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/reports/:id', async (req, res) => {
-  if (!storage) return res.status(503).json({ error: 'Storage not configured' });
-  try {
-    const data = await getReport(req.params.id);
-    res.json(data);
-  } catch (err) {
-    res.status(404).json({ error: err.message });
   }
 });
 

@@ -354,11 +354,10 @@ main{flex:1;overflow-y:auto;width:100%;padding:clamp(12px,3vw,28px)}
     <div class="field">
       <label>저장소 상태</label>
       <div class="store-status">
-        <span class="pill"><span class="status-dot" id="r2-dot"></span> Cloudflare R2 <span id="r2-name" style="color:var(--muted)"></span></span>
         <span class="pill"><span class="status-dot" id="fb-dot"></span> Firebase Firestore</span>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">
-        세션을 켜고 분석하면 메타데이터는 <b>Firestore</b>, 전체 리포트는 <b>R2 버킷(lighthouse)</b>에 저장됩니다.
+        세션을 켜고 분석하면 리포트가 <b>Firestore</b>에 저장됩니다.
       </div>
     </div>
 
@@ -618,24 +617,12 @@ async function testConnection(){
     const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) });
     const d = await res.json();
     dot.className = 'status-dot ok';
-    st.textContent = `연결됨${d.storage === 'connected' ? ` · R2: ${d.bucket}` : ''}`;
+    st.textContent = `연결됨${d.field === 'enabled' ? ' · CrUX 사용 가능' : ''}`;
   } catch { dot.className = 'status-dot err'; st.textContent = '연결 실패'; }
 }
 async function checkStorage(){
-  // Firebase
   const fbDot = document.getElementById('fb-dot');
-  if (fbDot) fbDot.className = 'status-dot ' + (window.LH_DB ? 'ok' : '');
-  // R2 via server
-  const r2Dot = document.getElementById('r2-dot'), r2Name = document.getElementById('r2-name');
-  try {
-    const res = await fetch(`${getApiBase()}/health`, { signal: AbortSignal.timeout(3000) });
-    const d = await res.json();
-    if (r2Dot) r2Dot.className = 'status-dot ' + (d.storage === 'connected' ? 'ok' : 'err');
-    if (r2Name) r2Name.textContent = d.bucket ? `(${d.bucket})` : '(미설정)';
-  } catch {
-    if (r2Dot) r2Dot.className = 'status-dot err';
-    if (r2Name) r2Name.textContent = '(서버 미연결)';
-  }
+  if (fbDot) fbDot.className = 'status-dot ' + (window.LH_DB ? 'ok' : 'err');
 }
 window.addEventListener('lh-db-ready', checkStorage);
 
@@ -673,9 +660,8 @@ function runAudit(){
   const main = document.getElementById('main');
   main.innerHTML = `<div class="loading"><div class="spinner"></div><div style="font-size:15px;font-weight:600">분석 중...</div><div class="loading-status" id="ls">준비 중...</div></div>`;
 
-  const saveToStorage = sessionEnabled();  // session on → also save full report to R2
   const cookie = sessionEnabled() ? sessionCookie() : '';  // 세션 쿠키 주입 (로그인 분석)
-  const body = JSON.stringify({ url, categories: cats, device: currentDevice, saveToStorage, cookie });
+  const body = JSON.stringify({ url, categories: cats, device: currentDevice, cookie });
 
   fetch(`${apiBase}/audit`, { method:'POST', headers:{'Content-Type':'application/json'}, body })
   .then(res => {
@@ -720,11 +706,11 @@ async function onResult(data){
       await window.LH_DB.save({
         url: data.url, device: data.device, deviceLabel: data.deviceLabel,
         fetchTime: data.fetchTime, session, scores,
-        reportId: data.reportId || null,
-        result: stripDetails(data),   // lite render fallback
+        result: stripDetails(data),   // 구조화 뷰용 (상세표 제외, 용량 절감)
+        markdown: toMarkdown(data),   // 전체 리포트 마크다운 문서 (상세표 포함)
       });
       const badge = document.getElementById('save-badge');
-      if (badge) badge.textContent = '☁ Firestore 저장됨';
+      if (badge) badge.title = 'Firestore에 저장됨';
     } catch(e){ console.warn('Firestore save failed', e); }
   }
 }
@@ -860,8 +846,7 @@ function renderResult(r){
     <div class="result-header">
       <div class="result-url">${r.url}</div>
       <span class="badge">${DEV_ICONS[r.device]||'🖥'} ${r.deviceLabel||r.device}</span>
-      ${r.session?`<span class="badge" style="color:var(--good)">⬢ ${r.session}</span>`:''}
-      ${r.reportId?`<span class="badge" id="save-badge" title="R2 저장됨">☁ 저장됨</span>`:''}
+      ${r.session?`<span class="badge" id="save-badge" style="color:var(--good)">⬢ ${r.session}</span>`:''}
       <span class="badge">${date}</span>
       <button class="btn btn-ghost btn-sm" onclick="downloadMarkdown()" title="마크다운 리포트 다운로드">⬇ 마크다운</button>
     </div>
@@ -1049,23 +1034,13 @@ window.filterBySession = async function(sess){
     : '<div style="color:var(--muted);font-size:13px;padding:20px 0">해당 세션의 리포트가 없습니다.</div>';
 };
 
-async function viewReport(id){
+function viewReport(id){
   const r = (window._reports||[]).find(x => x.id === id);
   if (!r) return;
-  const main = document.getElementById('main');
-  main.innerHTML = '<div class="loading"><div class="spinner"></div><div>리포트 불러오는 중...</div></div>';
-
-  let full = null;
-  // try R2 full report via server
-  if (r.reportId){
-    try {
-      const res = await fetch(`${getApiBase()}/reports/${r.reportId}`, { signal: AbortSignal.timeout(8000) });
-      if (res.ok) full = await res.json();
-    } catch {}
-  }
-  const data = full || r.result;
-  if (!data){ main.innerHTML = '<div class="error-box">리포트 데이터를 찾을 수 없습니다.</div>'; return; }
+  const data = r.result;
+  if (!data){ document.getElementById('main').innerHTML = '<div class="error-box">리포트 데이터를 찾을 수 없습니다.</div>'; return; }
   data.session = r.session;
+  data._md = r.markdown || null;   // 저장된 전체 마크다운(상세표 포함) → 다운로드용
   _result = data;
   activeAuditTab = Object.keys(data.categories)[0] || 'performance';
   document.querySelectorAll('.page-tab').forEach(t => t.classList.toggle('active', t.dataset.page === 'home'));
@@ -1083,7 +1058,7 @@ function mdToHtml(t){
 // ── 마크다운 리포트 생성/다운로드 ──
 function downloadMarkdown(){
   if (!_result) return;
-  const md = toMarkdown(_result);
+  const md = _result._md || toMarkdown(_result);  // 저장된 전체 마크다운 우선
   const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

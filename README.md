@@ -5,7 +5,7 @@ Chrome DevTools Lighthouse와 유사한 웹 성능 분석 도구.
 
 ## 기능
 
-- **4가지 장치** — iPhone 14 / Galaxy S23 / iPad Pro / Desktop
+- **4가지 장치** — iPhone / Galaxy / iPad / Desktop
 - **4가지 카테고리** — 성능 · 접근성 · 권장사항 · SEO
 - **실제 사용자 데이터(CrUX)** — PageSpeed Insights처럼 실제 방문자의 Core Web Vitals
   (LCP·INP·CLS·FCP·TTFB) 분포 막대 + **Core Web Vitals 평가(통과/실패)** 배지 (`CRUX_API_KEY` 필요)
@@ -14,8 +14,7 @@ Chrome DevTools Lighthouse와 유사한 웹 성능 분석 도구.
   - 예: `security_portal_auth=portal-v1.eyJ...` → Lighthouse·스크린샷이 인증된 화면을 분석/캡처
   - 쿠키 이름(`=` 앞부분)이 리포트 그룹 라벨로 사용됨. `=`가 없으면 단순 그룹 이름으로 동작
   - ⚠ 쿠키 값은 민감정보 — URL/DB에는 라벨만 저장, 쿠키 값은 분석 요청에만 사용
-- **Firebase Firestore** — 리포트 메타데이터/점수 DB (세션별 조회·필터)
-- **Cloudflare R2** — 전체 리포트 파일 저장 (버킷 `lighthouse`)
+- **Firebase Firestore** — 리포트 저장 (점수 + 구조화 데이터 + 전체 마크다운 문서, 세션별 조회·필터)
 - **장치 미리보기** — 선택한 장치 크기로 실제 사이트 렌더링
   - 📸 **스크린샷** 모드: 서버 헤드리스 Chrome 캡처 (정적 이미지)
   - 🪟 **실시간** 모드: 서버 경로 프록시(`/proxy`, `/p/`)로 X-Frame-Options/CSP를 우회하고
@@ -31,15 +30,12 @@ Chrome DevTools Lighthouse와 유사한 웹 성능 분석 도구.
 
 ```
 [브라우저] ──분석요청──► [로컬 Node 서버] ──Lighthouse 실행──► 결과
-     │                        │
-     │                        └──전체 리포트──► Cloudflare R2 (버킷: lighthouse)
      │
-     └──메타데이터/점수──► Firebase Firestore (세션별)
+     └──점수 + 구조화 데이터 + 마크다운──► Firebase Firestore (세션별)
 ```
 
 - **분석 실행**: 로컬 Node 서버(Chrome headless). GitHub Pages에선 ⚙ 설정에서 서버 URL 연결.
-- **DB**: Firestore는 클라이언트에서 직접 사용 (서버 키 불필요).
-- **버킷**: R2는 서버에서 업로드 (API 키 필요).
+- **저장**: Firestore를 클라이언트에서 직접 사용 (서버 스토리지 키 불필요). 별도 S3/R2 없음.
 
 ## 빠른 시작
 
@@ -47,19 +43,8 @@ Chrome DevTools Lighthouse와 유사한 웹 성능 분석 도구.
 git clone https://github.com/sanghakbae/lighthouse
 cd lighthouse
 npm install
-cp .env.example .env   # R2 키 입력 (선택)
+cp .env.example .env   # CrUX 키 입력 (선택)
 npm start              # http://localhost:3000
-```
-
-## Cloudflare R2 설정
-
-Cloudflare 대시보드 → R2 → "Manage R2 API Tokens"에서 키 발급 후 `.env`:
-
-```env
-CF_ACCOUNT_ID=02f0426678a5977483be4b2210cdf293
-R2_ACCESS_KEY_ID=...
-R2_SECRET_ACCESS_KEY=...
-R2_BUCKET=lighthouse
 ```
 
 ## 실제 사용자 데이터 (CrUX / PageSpeed Insights 필드 데이터)
