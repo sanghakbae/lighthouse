@@ -465,19 +465,18 @@ let currentPage = 'home';
 let _result = null;
 
 const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-const isHosted = !isLocal;  // 로컬이 아니면 분석 서버 URL을 별도 지정해야 함
+const isHosted = !isLocal;
+// 클라우드 분석 서버 (Render) — 배포 페이지에서 로컬 서버 없이 자동 연결
+const DEFAULT_API = 'https://lighthouse-czug.onrender.com';
 // 항상 절대 URL 반환 (상대경로 '/audit' 파싱 오류 방지)
 function getApiBase() {
   if (isLocal) return location.origin;
-  return (localStorage.getItem('lh_api_url') || '').replace(/\/$/, '');
+  return (localStorage.getItem('lh_api_url') || DEFAULT_API).replace(/\/$/, '');
 }
 
 // ── Init ──
 (async function init(){
-  if (isHosted) {
-    document.getElementById('github-notice').style.display = 'block';
-    if (!localStorage.getItem('lh_api_url')) setTimeout(openSettings, 400);
-  }
+  // 배포 페이지는 기본 클라우드 서버(DEFAULT_API)에 자동 연결되므로 별도 안내 불필요
   // session restore
   const urlSession = new URLSearchParams(location.search).get('session');
   const lsRaw = localStorage.getItem('lh_session_name') || '';
