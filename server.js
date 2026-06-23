@@ -323,7 +323,10 @@ app.post('/audit', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');   // 프록시 버퍼링 방지 (즉시 스트리밍)
   const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+  // 분석은 수십 초 걸릴 수 있음 → 10초마다 heartbeat로 연결 유지 (중간 끊김 방지)
+  const heartbeat = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 10000);
 
   let chrome;
   try {
@@ -357,6 +360,7 @@ app.post('/audit', async (req, res) => {
   } catch (err) {
     send({ type: 'error', message: err.message });
   } finally {
+    clearInterval(heartbeat);
     if (chrome) await chrome.kill();
     res.end();
   }
