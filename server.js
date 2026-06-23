@@ -7,8 +7,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 리포트 저장은 클라이언트에서 Firebase Firestore로 직접 처리 (서버 측 스토리지 없음)
 
-// 헤드리스 Chrome 실행 플래그 (컨테이너 환경 대응: --no-sandbox, --disable-dev-shm-usage)
-const CHROME_FLAGS = ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'];
+// 헤드리스 Chrome 실행 플래그 (컨테이너/저사양 대응 + 메모리 절감)
+const CHROME_FLAGS = [
+  '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+  '--disable-extensions', '--disable-background-networking', '--disable-default-apps',
+  '--no-first-run', '--mute-audio', '--disable-sync',
+];
 
 // ── Device configurations ──────────────────────────────────────────────────
 const DEVICES = {
@@ -339,18 +343,24 @@ app.post('/audit', async (req, res) => {
     const deviceCfg = DEVICES[device] || DEVICES.pc;
     const enabledCategories = categories?.length ? categories : ['performance', 'accessibility', 'best-practices', 'seo'];
 
-    const runnerResult = await lighthouse(url, {
-      logLevel: 'error',
-      output: 'json',
-      locale: 'ko',                       // 한글 리포트 (제목·설명 공식 번역)
-      onlyCategories: enabledCategories,
-      port: chrome.port,
-      formFactor: deviceCfg.formFactor,
-      screenEmulation: deviceCfg.screenEmulation,
-      throttlingMethod: 'simulate',
-      // 세션 쿠키 주입 → 로그인된 페이지 분석 (모든 요청에 Cookie 헤더 적용)
-      ...(cookie ? { extraHeaders: { Cookie: cookie } } : {}),
-    });
+    const runnerResult = await Promise.race([
+      lighthouse(url, {
+        logLevel: 'error',
+        output: 'json',
+        locale: 'ko',                       // 한글 리포트 (제목·설명 공식 번역)
+        onlyCategories: enabledCategories,
+        port: chrome.port,
+        formFactor: deviceCfg.formFactor,
+        screenEmulation: deviceCfg.screenEmulation,
+        throttlingMethod: 'simulate',
+        maxWaitForLoad: 45000,              // 페이지 로드 대기 상한 (무한 대기 방지)
+        // 세션 쿠키 주입 → 로그인된 페이지 분석 (모든 요청에 Cookie 헤더 적용)
+        ...(cookie ? { extraHeaders: { Cookie: cookie } } : {}),
+      }),
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error('분석 시간 초과 — 서버 사양이 부족할 수 있습니다. 카테고리를 줄이거나 로컬 서버를 사용하세요.')),
+        180000)),  // 전체 분석 타임아웃 (무한 멈춤 방지)
+    ]);
 
     const lhr = runnerResult.lhr;
     const result = buildResult(lhr, device, deviceCfg.label);
