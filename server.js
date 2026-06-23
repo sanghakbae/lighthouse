@@ -202,6 +202,13 @@ function proxifyHtml(html, finalUrl) {
   return html;
 }
 
+// fetch 실패 원인(undici cause)까지 노출 (ECONNREFUSED/ETIMEDOUT/ENOTFOUND 등)
+function errMsg(e) {
+  const c = e && e.cause;
+  const detail = c ? (c.code || c.message) : '';
+  return detail ? `${e.message} — ${detail}` : (e && e.message) || String(e);
+}
+
 // 쿠키 jar 헬퍼 (lhpx 쿠키에 세션 누적 → 로그인 흐름 유지)
 function parseCookiePairs(s) {
   const map = {};
@@ -287,7 +294,7 @@ app.all('/proxy', rawBody, async (req, res) => {
   if (!/^https?:\/\//.test(url)) url = 'https://' + url;
   const d = SHOT_DEVICES[device] || SHOT_DEVICES.pc;
   try { await proxyForward(req, res, url, d.ua, true); }
-  catch (e) { res.status(502).send(`<div style="font-family:sans-serif;padding:24px;color:#f85149">실시간 프록시 로드 실패: ${e.message}</div>`); }
+  catch (e) { res.status(502).send(`<div style="font-family:sans-serif;padding:24px;color:#f85149">실시간 프록시 로드 실패: ${errMsg(e)}</div>`); }
 });
 
 // 하위 리소스/폼 제출: /p/<실제 URL> (상대경로 해석되도록 경로 구조 보존, 모든 메서드)
@@ -295,7 +302,7 @@ app.all(/^\/p\//, rawBody, async (req, res) => {
   const target = req.originalUrl.slice(3); // '/p/' 제거 → https://host/path?query
   if (!/^https?:\/\//.test(target)) return res.status(400).send('bad target');
   try { await proxyForward(req, res, target, DESKTOP_UA, false); }
-  catch (e) { res.status(502).send('proxy error: ' + e.message); }
+  catch (e) { res.status(502).send('proxy error: ' + errMsg(e)); }
 });
 
 // ── Audit (SSE streaming) ──────────────────────────────────────────────────
