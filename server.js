@@ -162,7 +162,10 @@ app.get('/screenshot', async (req, res) => {
     await page.setViewport({ width: d.width, height: d.height, deviceScaleFactor: d.dsf, isMobile: d.mobile, hasTouch: d.mobile });
     if (d.ua) await page.setUserAgent(d.ua);
     if (cookie) await page.setExtraHTTPHeaders({ Cookie: cookie });  // 세션 쿠키 주입 (로그인 화면 캡처)
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    // networkidle2는 광고·트래커가 많은 무거운 사이트(네이버 등)에서 타임아웃 → DOM 로드 후 잠깐 대기
+    try { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 }); }
+    catch (e) { /* 타임아웃이어도 현재까지 렌더된 화면을 캡처 */ }
+    await new Promise(r => setTimeout(r, 2000));   // 상단 콘텐츠 렌더 안정화
     const buf = await page.screenshot({ type: 'png', fullPage: fullPage === '1' });
 
     res.set('Content-Type', 'image/png');
