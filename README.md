@@ -44,7 +44,7 @@ git clone https://github.com/sanghakbae/lighthouse
 cd lighthouse
 npm install
 cp .env.example .env   # CrUX 키 입력 (선택)
-npm start              # http://localhost:3000
+npm start              # http://localhost:4567
 ```
 
 ## 분석 서버 클라우드 배포 (로컬 없이 사용)

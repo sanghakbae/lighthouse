@@ -430,5 +430,5 @@ app.all(/.*/, rawBody, async (req, res, next) => {
   catch { next(); }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4567;
 app.listen(PORT, () => console.log(`Lighthouse UI → http://localhost:${PORT}`));

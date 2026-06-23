@@ -342,7 +342,7 @@ main{flex:1;overflow-y:auto;width:100%;padding:clamp(12px,3vw,28px)}
     <div class="field">
       <label>API 서버 URL</label>
       <div class="field-row">
-        <input type="url" id="api-url-input" placeholder="http://localhost:3000"/>
+        <input type="url" id="api-url-input" placeholder="http://localhost:4567"/>
         <button class="btn btn-ghost btn-sm" onclick="testConnection()">연결 확인</button>
       </div>
       <div class="status-row">
@@ -380,7 +380,7 @@ main{flex:1;overflow-y:auto;width:100%;padding:clamp(12px,3vw,28px)}
         Lighthouse 분석은 로컬 서버에서 실행됩니다.<br><br>
         <code>git clone https://github.com/sanghakbae/lighthouse</code><br>
         <code>cd lighthouse &amp;&amp; npm install &amp;&amp; npm start</code><br><br>
-        그 다음 ⚙ 설정에서 <b>http://localhost:3000</b> 을 입력하세요.
+        그 다음 ⚙ 설정에서 <b>http://localhost:4567</b> 을 입력하세요.
       </div>
     </div>
   </main>
@@ -593,7 +593,7 @@ function loadHistory(idx){
 // ── Settings ──
 function openSettings(){
   // 입력칸을 현재 사용 중인 서버로 미리 채움 (비어 보이지 않게)
-  document.getElementById('api-url-input').value = localStorage.getItem('lh_api_url') || (isHosted ? DEFAULT_API : 'http://localhost:3000');
+  document.getElementById('api-url-input').value = localStorage.getItem('lh_api_url') || (isHosted ? DEFAULT_API : 'http://localhost:4567');
   document.getElementById('settings-modal').classList.add('open');
   checkStorage();
   testConnection();   // 열 때마다 자동으로 연결 상태 확인 (stale 방지)
@@ -647,7 +647,7 @@ function runAudit(){
 
   const apiBase = getApiBase();
   if (!apiBase){
-    alert('분석 서버 URL이 설정되지 않았습니다. ⚙ 설정에서 서버 주소(예: http://localhost:3000)를 입력하세요.');
+    alert('분석 서버 URL이 설정되지 않았습니다. ⚙ 설정에서 서버 주소(예: http://localhost:4567)를 입력하세요.');
     openSettings();
     return;
   }
