@@ -592,9 +592,11 @@ function loadHistory(idx){
 
 // ── Settings ──
 function openSettings(){
-  document.getElementById('api-url-input').value = localStorage.getItem('lh_api_url') || '';
+  // 입력칸을 현재 사용 중인 서버로 미리 채움 (비어 보이지 않게)
+  document.getElementById('api-url-input').value = localStorage.getItem('lh_api_url') || (isHosted ? DEFAULT_API : 'http://localhost:3000');
   document.getElementById('settings-modal').classList.add('open');
   checkStorage();
+  testConnection();   // 열 때마다 자동으로 연결 상태 확인 (stale 방지)
 }
 function closeSettings(){ document.getElementById('settings-modal').classList.remove('open'); }
 document.getElementById('settings-btn').addEventListener('click', openSettings);
@@ -613,11 +615,11 @@ async function testConnection(){
   const dot = document.getElementById('conn-dot'), st = document.getElementById('conn-status');
   dot.className = 'status-dot'; st.textContent = '확인 중...';
   try {
-    const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(12000) });
     const d = await res.json();
     dot.className = 'status-dot ok';
     st.textContent = `연결됨${d.field === 'enabled' ? ' · CrUX 사용 가능' : ''}`;
-  } catch { dot.className = 'status-dot err'; st.textContent = '연결 실패'; }
+  } catch { dot.className = 'status-dot err'; st.textContent = '연결 실패 (콜드 스타트면 잠시 후 재시도)'; }
 }
 async function checkStorage(){
   const fbDot = document.getElementById('fb-dot');
